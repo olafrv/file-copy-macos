@@ -1,0 +1,6 @@
+{
+  "name": "file-copy-macos",
+  "description": "The file-copy-macos mod for Claude Code: copy files and folders into a project folder from a band above the prompt.",
+  "owner": { "name": "Olaf Reitmaier" },
+  "plugins": [{ "name": "file-copy-macos", "source": "./" }]
+}
