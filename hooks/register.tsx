@@ -936,11 +936,14 @@ export const register: Register = on => {
           <Box width={LABEL_WIDTH}>
             <Text>⌨ Shortcuts:</Text>
           </Box>
-          <Text dimColor>
-            {e.surface === 'terminal'
-              ? 'Drag files into the field · Enter copies'
-              : 'Option+Cmd+C in Finder copies paths · Enter copies'}
-          </Text>
+          <Box flexGrow={1} flexShrink={1}>
+            <Text dimColor wrap="wrap">
+              {e.surface === 'terminal'
+                ? 'Drag files into the field · Enter copies'
+                : 'Option+Cmd+C in Finder copies paths · Enter copies'}
+            </Text>
+          </Box>
+          {modVersion !== null && <Text dimColor>{`file-copy-macos v${modVersion}`}</Text>}
         </Box>
         {ask !== null && (
           <Box flexDirection="row" gap={1}>
@@ -1031,11 +1034,6 @@ export const register: Register = on => {
             {!confirmingLast && (
               <Button key="hide" label="🙈 Hide" onPress={() => update($, isHidden, () => true)} />
             )}
-          </Box>
-        )}
-        {modVersion !== null && (
-          <Box flexDirection="row" justifyContent="flex-end">
-            <Text dimColor>{`file-copy-macos v${modVersion}`}</Text>
           </Box>
         )}
       </Box>

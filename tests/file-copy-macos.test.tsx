@@ -599,7 +599,7 @@ test('Contents shows each file size and none for folders', async ($, on) => {
   await ui.unmount()
 })
 
-test('the band shows the version from plugin.json in its last row', async ($, on) => {
+test('the band shows the version from plugin.json in the Shortcuts row', async ($, on) => {
   const reads: string[] = []
 
   on('session.root', () => ({ value: '/proj' }))
