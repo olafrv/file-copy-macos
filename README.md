@@ -9,7 +9,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
                ⤴️ my-app/
                📁 2026/        ↗️ Open
                ☐ 📄 report.pdf  13 KB   ↗️ Open   📝 Rename
-⌨ Shortcuts:  Option+Cmd+C in Finder copies paths · Enter copies   file-copy-macos v1.0.0
+⌨ Shortcuts:  Option+Cmd+C in Finder copies paths · Enter copies   file-copy-macos v1.1.0
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
