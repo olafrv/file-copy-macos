@@ -620,3 +620,63 @@ test('the band shows the version from plugin.json in its last row', async ($, on
     await ui.unmount()
   }
 })
+
+test('the file list deletes ticked folders with their contents after a confirmation', async ($, on) => {
+  const session = mock.session(on)
+  const trashed: string[] = []
+  let folder = ['a.pdf', 'docs/', 'old/']
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/bin/ls') {
+      return { value: ran(folder.join('\n') + '\n') }
+    }
+
+    if (e.argv[0] === '/usr/bin/trash') {
+      const path = e.argv[1] ?? ''
+      trashed.push(path)
+      folder = folder.filter(name => `/proj/${name.replace(/\/$/, '')}` !== path)
+    }
+
+    return { value: ran('') }
+  })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    trashed.length = 0
+    folder = ['a.pdf', 'docs/', 'old/']
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+
+    await ui.press({ key: 'list' })
+    await ui.press({ key: 'tick:docs/' })
+    expect(await ui.find({ key: 'dir:docs/' })).toBeDefined()
+    await ui.press({ key: 'delete-selected' })
+    expect(
+      await ui.find({
+        type: 'Text',
+        text: 'Delete the selected folder? Folders go to the Trash with all their contents.',
+      }),
+    ).toBeDefined()
+    await ui.press({ key: 'cancel-delete' })
+    expect(trashed).toEqual([])
+
+    await ui.press({ key: 'tick:old/' })
+    await ui.press({ key: 'file:a.pdf' })
+    await ui.press({ key: 'delete-selected' })
+    expect(
+      await ui.find({
+        type: 'Text',
+        text: 'Delete 1 file and 2 folders? Folders go to the Trash with all their contents.',
+      }),
+    ).toBeDefined()
+    await ui.press({ key: 'confirm-delete' })
+    expect([...trashed].sort()).toEqual(['/proj/a.pdf', '/proj/docs', '/proj/old'])
+    expect(await ui.find({ key: 'dir:docs/' })).toBeUndefined()
+    expect(await ui.find({ key: 'dir:old/' })).toBeUndefined()
+    await ui.press({ key: 'list' })
+    await ui.unmount()
+  }
+
+  const fyi = session.appended().filter(r => r.message.type === 'user')
+  expect(fyi.length).toBe(2)
+  expect(JSON.stringify(fyi[0])).toContain('1 file and 2 folders')
+})

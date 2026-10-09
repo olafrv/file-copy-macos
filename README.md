@@ -82,7 +82,7 @@ If a name already exists in the target, the mod asks first:
 - In **📋 Contents**, click a 📁 folder to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - **❇️ New folder...** creates a folder in the target and opens it.
 - Each file shows its size, a **↗️ Open** button (default macOS app) and a **📝 Rename** button. Folders have **↗️ Open** (Finder).
-- Tick files and use **❌ Delete selected** to move them to the Trash.
+- Tick files or folders (☐ in front of 📁) and use **❌ Delete selected** to move them to the Trash. A folder goes to the Trash with all its contents.
 
 ### What Claude is told
 

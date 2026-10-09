@@ -129,6 +129,28 @@ const targetDir = async ($: EngineInterface): Promise<string> => {
   return dir === '' ? root : `${root}/${dir}`
 }
 
+// "1 file", "2 folders", "1 file and 2 folders"; a folder name ends in "/".
+const countItems = (names: readonly string[]): string => {
+  const folders = names.filter(n => n.endsWith('/')).length
+  const files = names.length - folders
+  const parts = [
+    files > 0 ? `${files} file${files === 1 ? '' : 's'}` : '',
+    folders > 0 ? `${folders} folder${folders === 1 ? '' : 's'}` : '',
+  ].filter(p => p !== '')
+
+  return parts.join(' and ')
+}
+
+const deleteQuestion = (names: readonly string[]): string => {
+  const hasFolder = names.some(n => n.endsWith('/'))
+  const what =
+    names.length === 1
+      ? `the selected ${hasFolder ? 'folder' : 'file'}`
+      : countItems(names)
+
+  return `Delete ${what}?${hasFolder ? ' Folders go to the Trash with all their contents.' : ''}`
+}
+
 const tellClaude = async (
   $: EngineInterface,
   root: string,
@@ -137,7 +159,7 @@ const tellClaude = async (
 ) => {
   const list = names.map(name => `- ${name}`).join('\n')
   const what = isRemoved
-    ? `moved ${names.length} file(s) from the folder ${root} to the Trash`
+    ? `moved ${countItems(names)} from the folder ${root} to the Trash (a name ending in "/" is a folder with all its contents)`
     : `copied ${names.length} file(s) into the folder ${root}`
   const note =
     `FYI from the file-copy-macos mod: the user ${what}:\n${list}\n\n` +
@@ -246,14 +268,15 @@ const trashNames = async ($: EngineInterface, root: string, names: string[]) => 
         return null
       }
 
-      const copied = result.copied.filter(name => !removed.includes(name))
+      const gone = removed.map(name => name.replace(/\/$/, ''))
+      const copied = result.copied.filter(name => !gone.includes(name))
 
       return copied.length > 0 ? { ...result, copied, skipped: [], failed: [] } : null
     })
 
     if (removed.length > 0) {
       await tellClaude($, root, removed, true)
-      $.ui.toast(`Moved ${removed.length} file(s) to the Trash`)
+      $.ui.toast(`Moved ${countItems(removed)} to the Trash`)
     }
 
     if (kept.length > 0) {
@@ -802,12 +825,20 @@ export const register: Register = on => {
               {names.map(name =>
                 name.endsWith('/') ? (
                   <Box key={`dirrow:${name}`} flexDirection="row" gap={2}>
-                    <Button
-                      key={`dir:${name}`}
-                      label={`📁 ${name}`}
-                      plain
-                      onPress={() => openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`)}
-                    />
+                    <Box flexDirection="row" gap={1}>
+                      <Button
+                        key={`tick:${name}`}
+                        label={ticked.includes(name) ? '☑' : '☐'}
+                        plain
+                        onPress={() => toggleSelected($, name)}
+                      />
+                      <Button
+                        key={`dir:${name}`}
+                        label={`📁 ${name}`}
+                        plain
+                        onPress={() => openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`)}
+                      />
+                    </Box>
                     <Button
                       key={`open:${name}`}
                       label="↗️ Open"
@@ -881,9 +912,7 @@ export const register: Register = on => {
               {confirming && (
                 <Box flexDirection="column">
                   <Text color="yellow">
-                    {ticked.length === 1
-                      ? 'Delete the selected file?'
-                      : `Delete the ${ticked.length} selected files?`}
+                    {deleteQuestion(ticked)}
                   </Text>
                   <Box flexDirection="row" gap={1}>
                     <Button
