@@ -939,8 +939,8 @@ export const register: Register = on => {
           <Box flexGrow={1} flexShrink={1}>
             <Text dimColor wrap="wrap">
               {e.surface === 'terminal'
-                ? 'Drag files into the field · Enter copies'
-                : 'Option+Cmd+C in Finder copies paths · Enter copies'}
+                ? 'Drag files into the field'
+                : 'Option+Cmd+C in Finder copies paths'}
             </Text>
           </Box>
           {modVersion !== null && <Text dimColor>{`file-copy-macos v${modVersion}`}</Text>}
