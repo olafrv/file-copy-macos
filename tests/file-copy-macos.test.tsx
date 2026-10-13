@@ -1211,10 +1211,10 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
 test('the In Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
-  const tip = 'Cmd+C → 📥 Paste, Opt+Cmd+C → Cmd+V in Src field'
+  const tip = 'Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field'
 
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
-  expect(await desktop.find({ type: 'Text', text: '⚡ In Finder:' })).toBeDefined()
+  expect(await desktop.find({ type: 'Text', text: '💡 In Finder:' })).toBeDefined()
   expect(await desktop.find({ type: 'Text', text: tip })).toBeDefined()
   await desktop.unmount()
 

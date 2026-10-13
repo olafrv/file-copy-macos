@@ -171,14 +171,14 @@ const clearFilter = async ($: EngineInterface) => {
   await update($, filterId, id => id + 1)
 }
 
-// Wide enough for "⚡ In Finder:" (an icon is 2 columns), so the rows line up.
+// Wide enough for "💡 In Finder:" (an icon is 2 columns), so the rows line up.
 const LABEL_WIDTH = 13
 // The desktop draws the labels in a narrower font: 13 cells left a wide gap.
 const DESKTOP_LABEL_WIDTH = 11
 
 // The two ways from Finder: files on the clipboard, or their paths as text.
 // The row's label says "In Finder:".
-const FINDER_TIP = 'Cmd+C → 📥 Paste, Opt+Cmd+C → Cmd+V in Src field'
+const FINDER_TIP = 'Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field'
 
 const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use Files... or Folder...'
 
@@ -1370,7 +1370,7 @@ export const register: Register = on => {
         )}
         <Box flexDirection="row" gap={1}>
           <Box width={labelWidth}>
-            <Text>⚡ In Finder:</Text>
+            <Text>💡 In Finder:</Text>
           </Box>
           <Box flexGrow={1} flexShrink={1}>
             <Text dimColor wrap="wrap">
