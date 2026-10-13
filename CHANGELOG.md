@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.0
+
+- The mod now uses Claude Code's own file access (`$.fs`) to list folders, read sizes and check names, instead of the commands `ls`, `stat`, `test` and `find`. File names arrive exactly as they are, so no name can be misread.
+- Latest download and pasted folders also use it.
+- The search runs git directly. Outside git, the mod walks the folders itself, shallow folders first, with the same limits and skipped folders.
+- Fewer processes per action: the shell scripts for listing, Latest download and search are gone.
+
 ## 1.12.1
 
 - Security: a search in a repository with a hostile `.git/config` (`core.fsmonitor`) could start a program. Git now runs with that setting off.
