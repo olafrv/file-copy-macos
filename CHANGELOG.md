@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.5
+
+- Shorter buttons: 📄 Files, 📂 Folder and 🗂️ New folder lose their "...".
+- ⬇️ Latest download is now 🧲 Download: it pulls the newest item of `~/Downloads` into the target (it still copies).
+- The clock shows `13.10.2026 14:32 CEST`, without the weekday.
+
 ## 1.13.4
 
 - The 💡 In Finder tip is shorter and clearer: "Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add". ">" separates the steps and "or" the ways. The terminal tip starts with "Drag into Src > 📥 Add or".
