@@ -198,7 +198,7 @@ const DESKTOP_LABEL_WIDTH = 11
 
 // The two ways from Finder: files on the clipboard, or their paths as text.
 // The row's label says "In Finder:".
-const FINDER_TIP = 'Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field'
+const FINDER_TIP = 'Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field -> 📥 Add'
 
 const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use Files... or Folder...'
 
@@ -1661,7 +1661,7 @@ export const register: Register = (on, options) => {
           <Box flexGrow={1} flexShrink={1}>
             <Text dimColor wrap="wrap">
               {e.surface === 'terminal'
-                ? `Drag into Src field, ${FINDER_TIP}`
+                ? `Drag into Src field -> 📥 Add, ${FINDER_TIP}`
                 : FINDER_TIP}
             </Text>
           </Box>
