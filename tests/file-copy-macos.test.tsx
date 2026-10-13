@@ -83,6 +83,13 @@ const fakeFs = (
   })
 }
 
+// The Target path as the band draws it: the part above the project as text,
+// then one button per folder.
+const crumbs = async (ui: { findAll: (q: object) => Promise<readonly { key?: string; props: { label?: unknown } }[]> }) =>
+  (await ui.findAll({ type: 'Button' }))
+    .filter(b => (b.key ?? '').startsWith('crumb:'))
+    .map(b => String(b.props.label))
+
 const ran = (stdout: string) => ({
   exitCode: 0,
   stdout,
@@ -141,7 +148,7 @@ test('copies on Enter and tells Claude as an FYI', async ($, on) => {
   for (const surface of ['terminal', 'desktop'] as const) {
     runs.length = 0
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: /^\/proj$/ })).toBeDefined()
+    expect(await crumbs(ui)).toEqual(['proj'])
 
     const field = await ui.find({ type: 'Input' })
     const key = field?.key ?? ''
@@ -405,7 +412,7 @@ test('Contents opens folders, makes them the target and creates new ones', async
   expect(rows).toEqual(['dir:docs/', 'dir:img/', 'file:a.pdf', 'file:b.pdf'])
   expect((await ui.find({ key: 'dir:docs/' }))?.props.label).toBe('📁 docs/')
   await ui.press({ key: 'dir:docs/' })
-  expect(await ui.find({ type: 'Text', text: '/proj/docs' })).toBeDefined()
+  expect(await crumbs(ui)).toEqual(['proj', 'docs'])
   expect(await ui.find({ key: 'file:old.txt' })).toBeDefined()
   expect(await ui.find({ key: 'up' })).toBeDefined()
 
@@ -423,13 +430,21 @@ test('Contents opens folders, makes them the target and creates new ones', async
   expect(await ui.find({ type: 'Text', text: '"taken" already exists here.' })).toBeDefined()
   await ui.input({ key: 'folder-name', text: '2026' })
   expect(runs).toContainEqual(['/bin/mkdir', '-p', '/proj/docs/2026'])
-  expect(await ui.find({ type: 'Text', text: '/proj/docs/2026' })).toBeDefined()
+  expect(await crumbs(ui)).toEqual(['proj', 'docs', '2026'])
   expect(await ui.find({ key: 'folder-name' })).toBeUndefined()
 
-  await ui.press({ key: 'up' })
-  await ui.press({ key: 'up' })
-  expect(await ui.find({ type: 'Text', text: '/proj' })).toBeDefined()
+  // A folder of the path opens it: one level up, then the project itself.
+  await ui.press({ key: 'crumb:1' })
+  expect(await crumbs(ui)).toEqual(['proj', 'docs'])
+  expect(await ui.find({ key: 'file:old.txt' })).toBeDefined()
+  await ui.press({ key: 'crumb:0' })
+  expect(await crumbs(ui)).toEqual(['proj'])
   expect(await ui.find({ key: 'up' })).toBeUndefined()
+
+  // And back down: ⤴️ up goes one level.
+  await ui.press({ key: 'dir:docs/' })
+  await ui.press({ key: 'up' })
+  expect(await crumbs(ui)).toEqual(['proj'])
   await ui.unmount()
 
   const fyi = session.appended().filter(r => r.message.type === 'user')

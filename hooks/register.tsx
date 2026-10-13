@@ -1286,7 +1286,23 @@ export const register: Register = (on, options) => {
           <Box width={labelWidth}>
             <Text>🎯 Target:</Text>
           </Box>
-          <Text dimColor>{shortPath(target)}</Text>
+          {/* The path: the part above the project as text, then one button per
+              folder from the project down; a click makes it the target. */}
+          <Box flexDirection="row" flexShrink={1}>
+            <Text dimColor wrap="truncate-start">{`${shortPath(parentOf(root))}/`}</Text>
+            {[baseName(root), ...(dir === '' ? [] : dir.split('/'))].map((part, i, parts) => (
+              <Box key={`crumb-box:${i}`} flexDirection="row">
+                {i > 0 && <Text dimColor>/</Text>}
+                <Button
+                  key={`crumb:${i}`}
+                  label={part}
+                  plain
+                  dimColor={i < parts.length - 1}
+                  onPress={() => openFolder($, parts.slice(1, i + 1).join('/'))}
+                />
+              </Box>
+            ))}
+          </Box>
           {/* Real buttons, as Files... and Folder... in the row above. */}
           <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
           <Button key="finder-target" label="📌 Finder" onPress={() => showInFinder($, '')} />
