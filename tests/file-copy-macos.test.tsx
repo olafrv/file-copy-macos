@@ -382,7 +382,7 @@ test('Files never shows the no-path hint', async ($, on) => {
   }
 })
 
-test('Contents opens folders, makes them the target and creates new ones', async ($, on) => {
+test('Content opens folders, makes them the target and creates new ones', async ($, on) => {
   const session = mock.session(on)
   const folders: Record<string, string[]> = { '/proj': ['a.pdf', 'docs/', 'b.pdf', 'img/'], '/proj/docs': ['old.txt'] }
   const runs: (readonly string[])[] = []
@@ -451,7 +451,7 @@ test('Contents opens folders, makes them the target and creates new ones', async
   expect(JSON.stringify(fyi)).toContain('created the folder /proj/docs/2026')
 })
 
-test('Contents renames a file, never over another one', async ($, on) => {
+test('Content renames a file, never over another one', async ($, on) => {
   const session = mock.session(on)
   let folder = ['a.pdf', 'b.pdf']
   const moves: (readonly string[])[] = []
@@ -582,14 +582,14 @@ test('the pasted list shows folders with a folder icon and counts items', async 
   }
 })
 
-test('the Contents label and folder rows use emoji on every surface', async ($, on) => {
+test('the Content label and folder rows use emoji on every surface', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
   fakeFs(on, dir => (dir === '/proj' ? ['docs/'] : undefined))
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: '📚 Contents:' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '📚 Content:' })).toBeDefined()
     await ui.press({ key: 'list' })
     expect((await ui.find({ key: 'dir:docs/' }))?.props.label).toBe('📁 docs/')
     expect(await ui.find({ type: 'Svg' })).toBeUndefined()
@@ -638,7 +638,7 @@ test('sizes read as Finder shows them', async () => {
   expect(humanSize(3_400_000_000)).toBe('3.4 GB')
 })
 
-test('Contents shows each file size and none for folders', async ($, on) => {
+test('Content shows each file size and none for folders', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
   fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf', 'My File.txt'] : undefined), {
@@ -730,7 +730,7 @@ test('the file list deletes ticked folders with their contents after a confirmat
   expect(JSON.stringify(fyi[0])).toContain('1 file and 2 folders')
 })
 
-test('Contents renames a folder, never over another one', async ($, on) => {
+test('Content renames a folder, never over another one', async ($, on) => {
   const session = mock.session(on)
   let folder = ['docs/', 'old/', 'a.pdf']
   const moves: (readonly string[])[] = []
@@ -783,7 +783,7 @@ test('Contents renames a folder, never over another one', async ($, on) => {
   expect(JSON.stringify(fyi[0])).toContain('renamed the folder docs to Docs 2026')
 })
 
-test('Contents shows 4 entries per page and keeps ticks across pages', async ($, on) => {
+test('Content shows 4 entries per page and keeps ticks across pages', async ($, on) => {
   const start = ['d1/', 'd2/', ...Array.from({ length: 7 }, (_, i) => `f${i + 1}.txt`)]
   const trashed: string[] = []
   let folder = [...start]
@@ -857,7 +857,7 @@ test('Contents shows 4 entries per page and keeps ticks across pages', async ($,
   }
 })
 
-test('Contents is a table: header, tick, name, size and actions per row', async ($, on) => {
+test('Content is a table: header, tick, name, size and actions per row', async ($, on) => {
   const opened: string[] = []
   const long = 'A very long file name that does not fit into the name column at all.pdf'
 
@@ -943,7 +943,7 @@ test('the list filters by name and sorts folders first, by name or size', async 
   expect(viewEntries(names, sizes, 'b', 'name', false)).toEqual(['b/', 'Big.iso'])
 })
 
-test('Contents sorts by a header click and filters by name', async ($, on) => {
+test('Content sorts by a header click and filters by name', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
   fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'big.zip', 'small.txt', 'mid.pdf'] : undefined), {
@@ -1070,7 +1070,7 @@ test('the clock reads the zone from macOS and shows date, time and zone', async 
   expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('31.12.2025 21:00 EST')
 })
 
-test('the In Finder row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
+test('the Finder row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('clock.now', () => ({ value: Date.UTC(2026, 9, 13, 12, 32, 15) }))
   on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/date' ? '+0200 CEST\n' : '') }))
@@ -1241,13 +1241,13 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
   }
 })
 
-test('the In Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
+test('the Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
   const tip = 'Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add'
 
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
-  expect(await desktop.find({ type: 'Text', text: '💡 In Finder:' })).toBeDefined()
+  expect(await desktop.find({ type: 'Text', text: '💡 Finder:' })).toBeDefined()
   expect(await desktop.find({ type: 'Text', text: tip })).toBeDefined()
   await desktop.unmount()
 

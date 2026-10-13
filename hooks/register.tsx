@@ -73,7 +73,7 @@ const isSortDesc = atom({ plugin: 'file-copy-macos', key: 'isSortDesc' } as cons
 const subdir = atom({ plugin: 'file-copy-macos', key: 'subdir' } as const, '')
 const isNamingFolder = atom({ plugin: 'file-copy-macos', key: 'isNamingFolder' } as const, false)
 const folderError = atom({ plugin: 'file-copy-macos', key: 'folderError' } as const, null)
-// The file in Contents whose name is being edited, and what was wrong with
+// The file in Content whose name is being edited, and what was wrong with
 // the new name.
 const renaming = atom({ plugin: 'file-copy-macos', key: 'renaming' } as const, null)
 const renameError = atom({ plugin: 'file-copy-macos', key: 'renameError' } as const, null)
@@ -191,13 +191,13 @@ const clearFilter = async ($: EngineInterface) => {
   await endSearch($)
 }
 
-// Wide enough for "💡 In Finder:" (an icon is 2 columns), so the rows line up.
-const LABEL_WIDTH = 13
-// The desktop draws the labels in a narrower font: 13 cells left a wide gap.
-const DESKTOP_LABEL_WIDTH = 11
+// Wide enough for "📚 Content:" (an icon is 2 columns), so the rows line up.
+const LABEL_WIDTH = 11
+// The desktop draws the labels in a narrower font: it needs one cell less.
+const DESKTOP_LABEL_WIDTH = 10
 
 // The two ways from Finder: files on the clipboard, or their paths as text.
-// The row's label says "In Finder:".
+// The row's label says "Finder:".
 const FINDER_TIP = 'Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add'
 
 const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use 📄 Files or 📂 Folder.'
@@ -205,7 +205,7 @@ const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use 📄 Fi
 const shortPath = (path: string): string =>
   path.replace(/^\/Users\/[^/]+/, '~')
 
-// Where copies go: the project root, or the folder opened in Contents.
+// Where copies go: the project root, or the folder opened in Content.
 const targetDir = async ($: EngineInterface): Promise<string> => {
   const root = await $.session.root()
   const dir = await read($, subdir)
@@ -455,7 +455,7 @@ const startRename = async ($: EngineInterface, name: string | null) => {
 
 // Renames a file or folder of the target, or, in a search, below it. Never
 // overwrites: a name already taken is refused. The item stays in its own
-// folder (no "/" in the new name). `entry` is the name or path as Contents
+// folder (no "/" in the new name). `entry` is the name or path as Content
 // lists it; a folder's ends in "/".
 const renameFile = async ($: EngineInterface, entry: string, raw: string) => {
   const isFolder = entry.endsWith('/')
@@ -1309,7 +1309,7 @@ export const register: Register = (on, options) => {
         </Box>
         <Box flexDirection="row" gap={1} marginTop={rowSpace}>
           <Box width={labelWidth}>
-            <Text>📚 Contents:</Text>
+            <Text>📚 Content:</Text>
           </Box>
           <Button
             key="list"
@@ -1656,7 +1656,7 @@ export const register: Register = (on, options) => {
         )}
         <Box flexDirection="row" gap={1}>
           <Box width={labelWidth}>
-            <Text>💡 In Finder:</Text>
+            <Text>💡 Finder:</Text>
           </Box>
           <Box flexGrow={1} flexShrink={1}>
             <Text dimColor wrap="wrap">

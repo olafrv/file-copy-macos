@@ -3,9 +3,9 @@
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
 ```
-📎 Src:        [Paste paths (↵ add)] 📥 Add   📄 Files  📂 Folder  📥 Paste  🧲 Download
-🎯 Target:     ~/Projects/my-app/docs   ↗️ Open  📌 Finder
-📚 Contents:   🙈 Hide   🗂️ New folder   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
+📎 Src:     [Paste paths (↵ add)] 📥 Add   📄 Files  📂 Folder  📥 Paste  🧲 Download
+🎯 Target:  ~/Projects/my-app/docs   ↗️ Open  📌 Finder
+📚 Content: 🙈 Hide   🗂️ New folder   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
 ⤴️ my-app/
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ ☐  │ Name ▲            │ Size    │ Actions                                │
@@ -14,8 +14,8 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
 └────────────────────────────────────────────────────────────────────────────┘
 1 selected:  ❌ Delete  💬 Ask  📋 Copy
-💡 In Finder:  Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add   13.10.2026 14:32 CEST · v1.13.5
-✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
+💡 Finder:  Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add   13.10.2026 14:32 CEST · v1.13.5
+✅ Copied:  report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
 ## Install
@@ -101,7 +101,7 @@ If a name already exists in the target, the mod asks first:
 ### Target and contents
 
 - **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. **↗️ Open** opens the target folder in Finder. **📌 Finder** shows it in its parent folder, selected.
-- **📚 Contents** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
+- **📚 Content** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - **🗂️ New folder** creates a folder in the target and opens it.
@@ -128,7 +128,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Clock
 
-The In Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
+The Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
 
 ### What Claude is told
 
