@@ -3,7 +3,7 @@
 
 import { expect, mock, test } from 'claude-code/testing'
 
-import { humanSize, parsePaths, toFieldText, viewEntries } from '../hooks/paths'
+import { formatClock, humanSize, parsePaths, parseZone, toFieldText, viewEntries } from '../hooks/paths'
 
 const BAND = {
   component: 'AbovePrompt',
@@ -532,7 +532,9 @@ test('the Contents label and folder rows use emoji on every surface', async ($, 
     expect(await ui.find({ type: 'Text', text: '📋 Contents:' })).toBeDefined()
     await ui.press({ key: 'list' })
     expect((await ui.find({ key: 'dir:docs/' }))?.props.label).toBe('📁 docs/')
-    expect(await ui.find({ type: 'Svg' })).toBeUndefined()
+    // No Svg icons; the desktop's GitHub logo is the one Svg.
+    const svg = await ui.find({ type: 'Svg' })
+    expect(svg === undefined || svg.props.alt === 'GitHub').toBe(true)
     await ui.press({ key: 'list' })
     await ui.unmount()
   }
@@ -601,31 +603,19 @@ test('Contents shows each file size and none for folders', async ($, on) => {
   await ui.unmount()
 })
 
-test('the desktop band links the version to the repository, the terminal band hides it', async ($, on) => {
-  const reads: string[] = []
-
+test('the desktop band has the GitHub logo and a link to the README, the terminal none', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
-  on('fs.read', ($, e) => {
-    reads.push(String(e.path))
 
-    return { value: JSON.stringify({ name: 'file-copy-macos', version: '9.8.7' }) }
-  })
-
-  on('session.start', () => ({ cwd: '/proj' }))
-  await $.session.start({ cwd: '/proj', surface: 'terminal', isInteractive: true })
-  expect(reads[0]).toMatch(/\/\.claude-plugin\/plugin\.json$/)
-
-  // The desktop shows it as a link to the repository; the terminal not at all.
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
   const link = await desktop.find({ type: 'Link' })
-  expect(link?.props.href).toBe('https://github.com/olafrv/file-copy-macos')
-  expect(link?.children).toEqual(['file-copy-macos v9.8.7'])
+  expect(link?.props.href).toBe('https://github.com/olafrv/file-copy-macos#readme')
+  expect(link?.children).toEqual(['GitHub'])
+  expect((await desktop.find({ type: 'Svg' }))?.props.alt).toBe('GitHub')
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
   expect(await terminal.find({ type: 'Link' })).toBeUndefined()
-  expect(await terminal.find({ type: 'Text', text: 'file-copy-macos v9.8.7' })).toBeUndefined()
   await terminal.unmount()
 })
 
@@ -1021,4 +1011,33 @@ test('Latest download copies the newest item of ~/Downloads', async ($, on) => {
   await ui.press({ key: 'latest-download' })
   expect(copies.length).toBe(1)
   await ui.unmount()
+})
+
+test('the clock reads the zone from macOS and shows date, time and zone', async () => {
+  expect(parseZone('+0200 CEST\n')).toEqual({ offset: 120, name: 'CEST' })
+  expect(parseZone('-0330 NST')).toEqual({ offset: -210, name: 'NST' })
+  expect(parseZone('')).toEqual({ offset: 0, name: 'UTC' })
+
+  // 12:32:15 UTC is 14:32 in CEST; seconds are not shown.
+  expect(formatClock(Date.UTC(2026, 9, 13, 12, 32, 15), 120, 'CEST')).toBe('Tue 13.10.2026 14:32 CEST')
+  // Late UTC evening is already the next day east of UTC, and the day before west of it.
+  expect(formatClock(Date.UTC(2025, 11, 31, 23, 30), 60, 'CET')).toBe('Thu 01.01.2026 00:30 CET')
+  expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('Wed 31.12.2025 21:00 EST')
+})
+
+test('the Shortcuts row shows the clock on both surfaces', async ($, on) => {
+  on('session.root', () => ({ value: '/proj' }))
+  on('clock.now', () => ({ value: Date.UTC(2026, 9, 13, 12, 32, 15) }))
+  on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/date' ? '+0200 CEST\n' : '') }))
+
+  on('session.start', () => ({ cwd: '/proj' }))
+  await $.session.start({ cwd: '/proj', surface: 'terminal', isInteractive: true })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    expect(await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })).toBeDefined()
+    // On the desktop a middle dot parts the clock from the GitHub link.
+    expect((await ui.find({ type: 'Text', text: '·' })) !== undefined).toBe(surface === 'desktop')
+    await ui.unmount()
+  }
 })

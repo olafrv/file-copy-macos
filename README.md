@@ -13,7 +13,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
                │ ☐  │ 📁 2026/          │         │ ↗️ Open  📝 Rename   │
                │ ☐  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open  📝 Rename   │
                └──────────────────────────────────────────────────────────┘
-⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   file-copy-macos v1.5.0
+⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · GitHub
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -93,6 +93,10 @@ If a name already exists in the target, the mod asks first:
 - The list shows 4 items per page. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
 - Each row has **↗️ Open** (default macOS app for a file, Finder for a folder) and **📝 Rename**.
 - Tick files or folders (☐) and use **❌ Delete selected** to move them to the Trash. A folder goes to the Trash with all its contents.
+
+### Clock
+
+The Shortcuts row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, a middle dot, the GitHub logo and a **GitHub** link follow the clock. The link opens this README.
 
 ### What Claude is told
 

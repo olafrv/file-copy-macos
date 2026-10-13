@@ -17,7 +17,9 @@ declare module 'claude-code' {
   interface PluginState {
     'file-copy-macos': {
       draft: string
-      version: string | null
+      clockNow: number
+      zoneOffset: number
+      zoneName: string
       fieldId: number
       seed: string
       pastedDirs: string[]

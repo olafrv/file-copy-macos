@@ -163,3 +163,32 @@ export const viewEntries = (
 
   return [...folders, ...files]
 }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/**
+ * The parts of `date +%z %Z` ("+0200 CEST"): the offset from UTC in minutes
+ * and the zone's name; UTC when the text is not that.
+ */
+export const parseZone = (text: string): { offset: number; name: string } => {
+  const match = /^([+-])(\d{2})(\d{2})\s+(\S+)/.exec(text.trim())
+
+  if (match === null) {
+    return { offset: 0, name: 'UTC' }
+  }
+
+  const minutes = Number(match[2]) * 60 + Number(match[3])
+
+  return { offset: match[1] === '-' ? -minutes : minutes, name: match[4] ?? 'UTC' }
+}
+
+/** A moment as "Mon 13.10.2026 14:32 CEST", in the zone given. */
+export const formatClock = (ms: number, offset: number, zone: string): string => {
+  const d = new Date(ms + offset * 60_000)
+  const two = (n: number) => String(n).padStart(2, '0')
+
+  return (
+    `${WEEKDAYS[d.getUTCDay()]} ${two(d.getUTCDate())}.${two(d.getUTCMonth() + 1)}.` +
+    `${d.getUTCFullYear()} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} ${zone}`
+  )
+}
