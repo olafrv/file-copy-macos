@@ -141,13 +141,13 @@ const HELP_URL = 'https://github.com/olafrv/file-copy-macos#readme'
 const PAGE_SIZE = 4
 
 // The file list's columns, in terminal cells: the tick box, the size
-// ("999 KB"), the actions ("↗️ Open  📝 Rename  💬 Mention") and the least the
-// name gets.
+// ("999 KB"), the actions ("↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy") and the least
+// the name gets.
 const TICK_WIDTH = 2
 // The desktop draws a Button with its own padding: the tick box needs more room.
 const DESKTOP_TICK_WIDTH = 5
 const SIZE_WIDTH = 9
-const ACTIONS_WIDTH = 30
+const ACTIONS_WIDTH = 39
 const MIN_NAME_WIDTH = 16
 
 // An icon and a name cut to `width` cells with "…"; the icon takes 2 cells.
@@ -171,7 +171,7 @@ const clearFilter = async ($: EngineInterface) => {
   await update($, filterId, id => id + 1)
 }
 
-// Wide enough for "⌨ Shortcuts:" (an icon is 2 columns), so the rows line up.
+// Wide enough for "⚡ Shortcuts:" (an icon is 2 columns), so the rows line up.
 const LABEL_WIDTH = 13
 
 const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use Files... or Folder...'
@@ -549,6 +549,62 @@ const mention = async ($: EngineInterface, names: readonly string[]) => {
 
   if (!filled.isFilled) {
     $.ui.toast('Could not write into the prompt now')
+  }
+}
+
+// JavaScript for Automation: puts the files given on the clipboard as files,
+// so Cmd+V pastes them in Finder, Mail or Slack; the mod cannot drag them out.
+// After the write, the script reads every item back: without that, macOS kept
+// only the first file once the script ended (tested on macOS 26). Prints how
+// many files the clipboard holds.
+const CLIPBOARD_SCRIPT = `function run(argv) {
+  ObjC.import('AppKit')
+  const board = $.NSPasteboard.generalPasteboard
+  board.clearContents
+  const urls = $.NSMutableArray.alloc.init
+  argv.forEach(p => urls.addObject($.NSURL.fileURLWithPath(p)))
+  board.writeObjects(urls)
+  const items = board.pasteboardItems
+  let count = 0
+  for (let i = 0; i < items.count; i++) {
+    if (ObjC.unwrap(items.objectAtIndex(i).stringForType('public.file-url'))) count++
+  }
+  return String(count)
+}`
+
+const pathsOf = async ($: EngineInterface, names: readonly string[]) => {
+  const dir = await targetDir($)
+
+  return names.map(name => `${dir}/${name.replace(/\/$/, '')}`)
+}
+
+const copyToClipboard = async ($: EngineInterface, names: readonly string[]) => {
+  const paths = await pathsOf($, names)
+  const { stdout } = await $.process.run([
+    '/usr/bin/osascript',
+    '-l',
+    'JavaScript',
+    '-e',
+    CLIPBOARD_SCRIPT,
+    ...paths,
+  ])
+
+  $.ui.toast(
+    Number(stdout.trim()) === paths.length
+      ? `Copied ${countItems(names)} to the clipboard. Paste with Cmd+V in Finder.`
+      : 'Could not copy to the clipboard',
+  )
+}
+
+// Opens Finder at the item's folder with the item selected, as "Show in
+// Finder" does; for a folder too (Finder's reveal script did not do that).
+// An empty name shows the target folder itself.
+const showInFinder = async ($: EngineInterface, name: string) => {
+  const [path = ''] = name === '' ? [await targetDir($)] : await pathsOf($, [name])
+  const { exitCode } = await $.process.run(['/usr/bin/open', '-R', path])
+
+  if (exitCode !== 0) {
+    $.ui.toast(`Could not show ${name === '' ? shortPath(path) : name} in Finder`)
   }
 }
 
@@ -966,17 +1022,27 @@ export const register: Register = on => {
             <Text>🎯 Target:</Text>
           </Box>
           <Text dimColor>{shortPath(target)}</Text>
-          <Button
-            key="open-target"
-            label="↗️ Open"
-            plain
-            dimColor
-            onPress={() => openWithDefaultApp($, '')}
-          />
+          {/* Side by side as in the table's Actions: no gap on the desktop. */}
+          <Box flexDirection="row" gap={lines ? 1 : 0}>
+            <Button
+              key="open-target"
+              label="↗️ Open"
+              plain
+              dimColor
+              onPress={() => openWithDefaultApp($, '')}
+            />
+            <Button
+              key="finder-target"
+              label="📌 Finder"
+              plain
+              dimColor
+              onPress={() => showInFinder($, '')}
+            />
+          </Box>
         </Box>
         <Box flexDirection="row" gap={1}>
           <Box width={LABEL_WIDTH}>
-            <Text>📋 Contents:</Text>
+            <Text>🗂️ Contents:</Text>
           </Box>
           <Button
             key="list"
@@ -1187,7 +1253,14 @@ export const register: Register = on => {
                           )}
                         </Box>
                         {lines && <Text dimColor>│</Text>}
-                        <Box width={ACTIONS_WIDTH + 2} paddingX={1} flexDirection="row" gap={2}>
+                        {/* The desktop draws each Button with its own padding: no gap
+                            needed there. The terminal needs one cell between labels. */}
+                        <Box
+                          width={ACTIONS_WIDTH + 2}
+                          paddingX={1}
+                          flexDirection="row"
+                          gap={lines ? 1 : 0}
+                        >
                           <Button
                             key={`open:${name}`}
                             label="↗️ Open"
@@ -1196,18 +1269,32 @@ export const register: Register = on => {
                             onPress={() => openWithDefaultApp($, name)}
                           />
                           <Button
+                            key={`show:${name}`}
+                            label="📌 Finder"
+                            plain
+                            dimColor
+                            onPress={() => showInFinder($, name)}
+                          />
+                          <Button
+                            key={`mention:${name}`}
+                            label="💬 Ask"
+                            plain
+                            dimColor
+                            onPress={() => mention($, [name])}
+                          />
+                          <Button
                             key={`rename:${name}`}
-                            label="📝 Rename"
+                            label="📝 Ren"
                             plain
                             dimColor
                             onPress={() => startRename($, name)}
                           />
                           <Button
-                            key={`mention:${name}`}
-                            label="💬 Mention"
+                            key={`copy:${name}`}
+                            label="📋 Copy"
                             plain
                             dimColor
-                            onPress={() => mention($, [name])}
+                            onPress={() => copyToClipboard($, [name])}
                           />
                         </Box>
                       </Box>
@@ -1216,17 +1303,15 @@ export const register: Register = on => {
                 </Box>
               )}
               {ticked.length > 0 && !confirming && (
-                <Box flexDirection="row" gap={1}>
+                <Box flexDirection="row" gap={1} alignItems="center">
+                  <Text dimColor>{`${ticked.length} selected:`}</Text>
                   <Button
                     key="delete-selected"
-                    label={`❌ Delete selected (${ticked.length})`}
+                    label="❌ Delete"
                     onPress={() => update($, isConfirming, () => true)}
                   />
-                  <Button
-                    key="mention-selected"
-                    label={`💬 Mention selected (${ticked.length})`}
-                    onPress={() => mention($, ticked)}
-                  />
+                  <Button key="mention-selected" label="💬 Ask" onPress={() => mention($, ticked)} />
+                  <Button key="copy-selected" label="📋 Copy" onPress={() => copyToClipboard($, ticked)} />
                 </Box>
               )}
               {confirming && (
@@ -1254,7 +1339,7 @@ export const register: Register = on => {
         )}
         <Box flexDirection="row" gap={1}>
           <Box width={LABEL_WIDTH}>
-            <Text>⌨ Shortcuts:</Text>
+            <Text>⚡ Shortcuts:</Text>
           </Box>
           <Box flexGrow={1} flexShrink={1}>
             <Text dimColor wrap="wrap">

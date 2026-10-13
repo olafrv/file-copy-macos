@@ -4,17 +4,17 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 
 ```
 📎 Source(s):  [Paste paths -> Enter]  📄 Files...  📂 Folder...  ⬇️ Latest download
-🎯 Target:     ~/Projects/my-app/docs   ↗️ Open
-📋 Contents:   🙈 Hide   ❇️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
+🎯 Target:     ~/Projects/my-app/docs   ↗️ Open  📌 Finder
+🗂️ Contents:   🙈 Hide   ❇️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
                ⤴️ my-app/
-               ┌──────────────────────────────────────────────────────────────────────┐
-               │ ☐  │ Name ▲            │ Size    │ Actions                          │
-               │────┼───────────────────┼─────────┼──────────────────────────────────│
-               │ ☐  │ 📁 2026/          │         │ ↗️ Open  📝 Rename  💬 Mention   │
-               │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open  📝 Rename  💬 Mention   │
-               └──────────────────────────────────────────────────────────────────────┘
-               ❌ Delete selected (1)  💬 Mention selected (1)
-⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · v1.7.0
+               ┌────────────────────────────────────────────────────────────────────────────┐
+               │ ☐  │ Name ▲            │ Size    │ Actions                                │
+               │────┼───────────────────┼─────────┼────────────────────────────────────────│
+               │ ☐  │ 📁 2026/          │         │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
+               │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
+               └────────────────────────────────────────────────────────────────────────────┘
+               1 selected:  ❌ Delete  💬 Ask  📋 Copy
+⚡ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · v1.7.0
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -84,18 +84,26 @@ If a name already exists in the target, the mod asks first:
 
 ### Target and contents
 
-- **🎯 Target** is the project root at the start. **↗️ Open** shows the target folder in Finder.
-- **📋 Contents** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
+- **🎯 Target** is the project root at the start. **↗️ Open** opens the target folder in Finder. **📌 Finder** shows it in its parent folder, selected.
+- **🗂️ Contents** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - **❇️ New folder...** creates a folder in the target and opens it.
 - **Filter:** is always shown. It shows only items whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
 - Click **Name** or **Size** in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
 - The list shows 4 items per page. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
-- Each row has **↗️ Open** (default macOS app for a file, Finder for a folder), **📝 Rename** and **💬 Mention**.
-- **💬 Mention** puts `@path` (relative to the project) at the cursor in the prompt, so you can ask Claude about the item. A path with a space is quoted: `@"docs/My File.pdf"`.
+- Each row has five actions:
+  - **↗️ Open:** opens a file in its default macOS app, a folder in Finder.
+  - **📌 Finder:** opens Finder at the item's folder with the item selected. From there you can drag it.
+  - **💬 Ask:** see below.
+  - **📝 Ren:** renames the item.
+  - **📋 Copy:** puts the item on the clipboard as a file. Press Cmd+V in Finder, on the Desktop, in Mail or in Slack to paste it.
+- **💬 Ask** puts `@path` (relative to the project) at the cursor in the prompt, so you can ask Claude about the item. A path with a space is quoted: `@"docs/My File.pdf"`.
 - Tick files or folders (☐). The ☐ in the header ticks all items that match the filter, on all pages; a second click unticks them.
-- **❌ Delete selected** moves the ticked items to the Trash. A folder goes to the Trash with all its contents. **💬 Mention selected** puts all ticked items into the prompt.
+- With items ticked, a row under the table offers:
+  - **❌ Delete:** moves them to the Trash. A folder goes to the Trash with all its contents.
+  - **💬 Ask:** puts all of them into the prompt.
+  - **📋 Copy:** puts them on the clipboard as files. Press Cmd+V in Finder, on the Desktop, in Mail or in Slack to paste them. This replaces drag and drop, which the mod cannot offer.
 
 ### Clock
 
@@ -119,7 +127,7 @@ The note does not start a turn. Claude reads it with your next message and does 
 
 ## Limits
 
-- **No real drag and drop on desktop.** The mod API has no event for files dropped from Finder. Use paste (Option+Cmd+C) or the pickers.
+- **No drag and drop.** The mod API has no drag events, in either direction. To bring files in, use paste (Option+Cmd+C) or the pickers. To take files out, use **📋 Copy** or **📌 Finder**.
 - **Buttons use the app's own style.** A mod cannot change their color or font size.
 - **Folder sizes are not shown.** Reading every file in a big folder would be slow.
 

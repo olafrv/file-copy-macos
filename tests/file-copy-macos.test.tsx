@@ -529,7 +529,7 @@ test('the Contents label and folder rows use emoji on every surface', async ($, 
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: '📋 Contents:' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '🗂️ Contents:' })).toBeDefined()
     await ui.press({ key: 'list' })
     expect((await ui.find({ key: 'dir:docs/' }))?.props.label).toBe('📁 docs/')
     expect(await ui.find({ type: 'Svg' })).toBeUndefined()
@@ -555,10 +555,12 @@ test('Open opens a file with its default app, a folder and the target in Finder'
   await ui.press({ key: 'open:a.pdf' })
   await ui.press({ key: 'open:docs/' })
   await ui.press({ key: 'open-target' })
+  await ui.press({ key: 'finder-target' })
   expect(opened).toEqual([
     ['/usr/bin/open', '/proj/a.pdf'],
     ['/usr/bin/open', '/proj/docs'],
     ['/usr/bin/open', '/proj'],
+    ['/usr/bin/open', '-R', '/proj'],
   ])
   expect(await ui.find({ type: 'Text', text: '/proj/docs' })).toBeUndefined()
   await ui.press({ key: 'list' })
@@ -860,16 +862,16 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
     const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
     expect(label.endsWith('…')).toBe(true)
     // 100 columns less the label (13) and its gap (1), then in the terminal
-    // tick (2), size (9), actions (30), padding and frame (10) and 3 column
-    // lines leave 32 for the name; on the desktop tick (5, no padding), size,
-    // actions, padding and frame (8) leave 34.
-    const nameWidth = surface === 'terminal' ? 32 : 34
+    // tick (2), size (9), actions (39), padding and frame (10) and 3 column
+    // lines leave 23 for the name; on the desktop tick (5, no padding), size,
+    // actions, padding and frame (8) leave 25.
+    const nameWidth = surface === 'terminal' ? 23 : 25
     expect([...label].length + 1).toBe(nameWidth)
 
     // A frame on both; column lines and a header line in the terminal only,
     // as the desktop's text font does not match its column widths.
     expect((await ui.find({ key: 'table' }))?.props.borderStyle).toBe('single')
-    const line = ['─'.repeat(4), '─'.repeat(nameWidth + 2), '─'.repeat(11), '─'.repeat(32)]
+    const line = ['─'.repeat(4), '─'.repeat(nameWidth + 2), '─'.repeat(11), '─'.repeat(41)]
     const hasLines = surface === 'terminal'
     expect((await ui.find({ type: 'Text', text: line.join('┼') })) !== undefined).toBe(hasLines)
     expect((await ui.find({ type: 'Text', text: '│' })) !== undefined).toBe(hasLines)
@@ -1050,7 +1052,7 @@ test('the Shortcuts row shows the clock on both surfaces, the version on the des
   }
 })
 
-test('Mention puts @paths into the prompt; the header tick selects all shown', async ($, on) => {
+test('Ask puts @paths into the prompt; the header tick selects all shown', async ($, on) => {
   const fills: { text: string; mode: string }[] = []
 
   on('session.root', () => ({ value: '/proj' }))
@@ -1088,14 +1090,14 @@ test('Mention puts @paths into the prompt; the header tick selects all shown', a
     await ui.press({ key: 'tick-all' })
     expect((await ui.find({ key: 'tick-all' }))?.props.label).toBe('☑')
     expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe('☑')
-    expect((await ui.find({ key: 'delete-selected' }))?.props.label).toBe('❌ Delete selected (3)')
+    expect(await ui.find({ type: 'Text', text: '3 selected:' })).toBeDefined()
     await ui.press({ key: 'tick-all' })
     expect(await ui.find({ key: 'delete-selected' })).toBeUndefined()
 
     // With a filter, only the matching items are ticked.
     await ui.input({ key: `filter-${fieldId}`, text: 'a.', kind: 'change' })
     await ui.press({ key: 'tick-all' })
-    expect((await ui.find({ key: 'mention-selected' }))?.props.label).toBe('💬 Mention selected (1)')
+    expect(await ui.find({ type: 'Text', text: '1 selected:' })).toBeDefined()
     await ui.press({ key: 'mention-selected' })
     expect(fills[2]).toEqual({ text: '@a.pdf ', mode: 'insert' })
     await ui.press({ key: 'tick-all' })
@@ -1114,4 +1116,50 @@ test('Mention puts @paths into the prompt; the header tick selects all shown', a
     fieldId += 1
     await ui.unmount()
   }
+})
+
+test('Copy puts items on the clipboard, also the ticked ones; Finder selects one item there', async ($, on) => {
+  const runs: (readonly string[])[] = []
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/bin/ls') {
+      return { value: ran('docs/\na.pdf\nMy File.txt\n') }
+    }
+
+    if (e.argv[0] === '/usr/bin/osascript' || e.argv[0] === '/usr/bin/open') {
+      runs.push(e.argv)
+      return { value: ran(e.argv[0] === '/usr/bin/osascript' ? `${e.argv.length - 5}\n` : '') }
+    }
+
+    return { value: ran('') }
+  })
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  await ui.press({ key: 'list' })
+  await ui.press({ key: 'tick:docs/' })
+  await ui.press({ key: 'tick:My File.txt' })
+  expect(await ui.find({ type: 'Text', text: '2 selected:' })).toBeDefined()
+  expect(await ui.find({ key: 'reveal-selected' })).toBeUndefined()
+
+  // Folders without their "/", spaces as they are: each path is one argument.
+  await ui.press({ key: 'copy-selected' })
+  expect(runs[0]?.slice(0, 4)).toEqual(['/usr/bin/osascript', '-l', 'JavaScript', '-e'])
+  expect(String(runs[0]?.[4])).toContain('writeObjects')
+  expect(runs[0]?.slice(5)).toEqual(['/proj/docs', '/proj/My File.txt'])
+
+  // Finder and Copy are row actions, for files and folders alike.
+  expect((await ui.find({ key: 'show:docs/' }))?.props.label).toBe('📌 Finder')
+  await ui.press({ key: 'show:docs/' })
+  await ui.press({ key: 'show:My File.txt' })
+  expect(runs.slice(1)).toEqual([
+    ['/usr/bin/open', '-R', '/proj/docs'],
+    ['/usr/bin/open', '-R', '/proj/My File.txt'],
+  ])
+  expect((await ui.find({ key: 'copy:a.pdf' }))?.props.label).toBe('📋 Copy')
+  await ui.press({ key: 'copy:a.pdf' })
+  expect(runs[3]?.slice(5)).toEqual(['/proj/a.pdf'])
+
+  await ui.press({ key: 'list' })
+  await ui.unmount()
 })
