@@ -121,6 +121,8 @@ const PAGE_SIZE = 5
 // The file list's columns, in terminal cells: the tick box, the size
 // ("999 KB"), the actions ("↗️ Open  📝 Rename") and the least the name gets.
 const TICK_WIDTH = 2
+// The desktop draws a Button with its own padding: the tick box needs more room.
+const DESKTOP_TICK_WIDTH = 5
 const SIZE_WIDTH = 9
 const ACTIONS_WIDTH = 18
 const MIN_NAME_WIDTH = 16
@@ -688,11 +690,16 @@ export const register: Register = on => {
     const pageCount = Math.max(1, Math.ceil(names.length / PAGE_SIZE))
     const shownPage = Math.min(listOpen ? await read($, page) : 0, pageCount - 1)
     const pageNames = names.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE)
-    // The Name column takes what the label, the other columns and the gaps leave.
-    const nameWidth = Math.max(
-      MIN_NAME_WIDTH,
-      e.props.bodyColumns - LABEL_WIDTH - TICK_WIDTH - SIZE_WIDTH - ACTIONS_WIDTH - 4,
-    )
+    // The "│" and "─┼─" lines only meet the columns in the terminal's monospace
+    // font; the desktop draws text in another font, so it gets the frame alone.
+    const lines = e.surface === 'terminal'
+    // Each column has a cell of padding on both sides (on the desktop, not the
+    // tick box), the frame 2 sides, and in the terminal 3 "│" between them.
+    const tickWidth = lines ? TICK_WIDTH : DESKTOP_TICK_WIDTH
+    const frame = tickWidth + SIZE_WIDTH + ACTIONS_WIDTH + (lines ? 13 : 8)
+    // The Name column takes what the label, its gap and the other columns leave.
+    const nameWidth = Math.max(MIN_NAME_WIDTH, e.props.bodyColumns - LABEL_WIDTH - 1 - frame)
+    const tableWidth = nameWidth + frame
     const showResult = result !== null && !hidden && !isBusy && ask === null
     // The Hide button sits on the last result line drawn.
     const hideOn =
@@ -863,95 +870,118 @@ export const register: Register = on => {
               )}
               {names.length === 0 && <Text dimColor>The folder is empty.</Text>}
               {names.length > 0 && (
-                <Box key="table-head" flexDirection="row" gap={1}>
-                  <Box width={TICK_WIDTH} />
-                  <Box width={nameWidth}>
-                    <Text dimColor>Name</Text>
+                <Box
+                  key="table"
+                  flexDirection="column"
+                  width={tableWidth}
+                  borderStyle="single"
+                  borderDimColor
+                >
+                  <Box key="table-head" flexDirection="row">
+                    <Box width={lines ? tickWidth + 2 : tickWidth} />
+                    {lines && <Text dimColor>│</Text>}
+                    <Box width={nameWidth + 2} paddingX={1}>
+                      <Text dimColor>Name</Text>
+                    </Box>
+                    {lines && <Text dimColor>│</Text>}
+                    <Box width={SIZE_WIDTH + 2} paddingX={1}>
+                      <Text dimColor>Size</Text>
+                    </Box>
+                    {lines && <Text dimColor>│</Text>}
+                    <Box width={ACTIONS_WIDTH + 2} paddingX={1}>
+                      <Text dimColor>Actions</Text>
+                    </Box>
                   </Box>
-                  <Box width={SIZE_WIDTH}>
-                    <Text dimColor>Size</Text>
-                  </Box>
-                  <Text dimColor>Actions</Text>
-                </Box>
-              )}
-              {pageNames.map(name =>
-                editing === name ? (
-                  <Box key={`edit:${name}`} flexDirection="column">
-                    <Box flexDirection="row" gap={1}>
-                      <Box flexGrow={1}>
-                        <Input
-                          key={`rename-field:${name}`}
-                          label="📝 Rename to:"
-                          value={name.replace(/\/$/, '')}
-                          submitLabel="📝 Rename"
-                          autoFocus
-                          onInput={() =>
-                            editError === null ? undefined : update($, renameError, () => null)
-                          }
-                          onSubmit={(value: string) => renameFile($, name, value)}
-                        />
+                  {lines && (
+                    <Text key="table-line" dimColor>
+                      {[tickWidth, nameWidth, SIZE_WIDTH, ACTIONS_WIDTH]
+                        .map(width => '─'.repeat(width + 2))
+                        .join('┼')}
+                    </Text>
+                  )}
+                  {pageNames.map(name =>
+                    editing === name ? (
+                      <Box key={`edit:${name}`} flexDirection="column" paddingX={1}>
+                        <Box flexDirection="row" gap={1}>
+                          <Box flexGrow={1}>
+                            <Input
+                              key={`rename-field:${name}`}
+                              label="📝 Rename to:"
+                              value={name.replace(/\/$/, '')}
+                              submitLabel="📝 Rename"
+                              autoFocus
+                              onInput={() =>
+                                editError === null ? undefined : update($, renameError, () => null)
+                              }
+                              onSubmit={(value: string) => renameFile($, name, value)}
+                            />
+                          </Box>
+                          <Button
+                            key="cancel-rename"
+                            label="⏹️ Cancel"
+                            plain
+                            onPress={() => startRename($, null)}
+                          />
+                        </Box>
+                        {editError !== null && <Text color="yellow">{editError}</Text>}
                       </Box>
-                      <Button
-                        key="cancel-rename"
-                        label="⏹️ Cancel"
-                        plain
-                        onPress={() => startRename($, null)}
-                      />
-                    </Box>
-                    {editError !== null && <Text color="yellow">{editError}</Text>}
-                  </Box>
-                ) : (
-                  <Box key={`row:${name}`} flexDirection="row" gap={1}>
-                    <Box width={TICK_WIDTH}>
-                      <Button
-                        key={`tick:${name}`}
-                        label={ticked.includes(name) ? '☑' : '☐'}
-                        plain
-                        onPress={() => toggleSelected($, name)}
-                      />
-                    </Box>
-                    <Box width={nameWidth}>
-                      {name.endsWith('/') ? (
-                        <Button
-                          key={`dir:${name}`}
-                          label={fitName(`📁 ${name}`, nameWidth)}
-                          plain
-                          onPress={() =>
-                            openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`)
-                          }
-                        />
-                      ) : (
-                        <Button
-                          key={`file:${name}`}
-                          label={fitName(`📄 ${name}`, nameWidth)}
-                          plain
-                          onPress={() => openWithDefaultApp($, name)}
-                        />
-                      )}
-                    </Box>
-                    <Box width={SIZE_WIDTH}>
-                      {sizeOf[name] !== undefined && (
-                        <Text dimColor>{humanSize(sizeOf[name])}</Text>
-                      )}
-                    </Box>
-                    <Box flexDirection="row" gap={2}>
-                      <Button
-                        key={`open:${name}`}
-                        label="↗️ Open"
-                        plain
-                        dimColor
-                        onPress={() => openWithDefaultApp($, name)}
-                      />
-                      <Button
-                        key={`rename:${name}`}
-                        label="📝 Rename"
-                        plain
-                        dimColor
-                        onPress={() => startRename($, name)}
-                      />
-                    </Box>
-                  </Box>
-                ),
+                    ) : (
+                      <Box key={`row:${name}`} flexDirection="row">
+                        <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
+                          <Button
+                            key={`tick:${name}`}
+                            label={ticked.includes(name) ? '☑' : '☐'}
+                            plain
+                            onPress={() => toggleSelected($, name)}
+                          />
+                        </Box>
+                        {lines && <Text dimColor>│</Text>}
+                        <Box width={nameWidth + 2} paddingX={1}>
+                          {name.endsWith('/') ? (
+                            <Button
+                              key={`dir:${name}`}
+                              label={fitName(`📁 ${name}`, nameWidth)}
+                              plain
+                              onPress={() =>
+                                openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`)
+                              }
+                            />
+                          ) : (
+                            <Button
+                              key={`file:${name}`}
+                              label={fitName(`📄 ${name}`, nameWidth)}
+                              plain
+                              onPress={() => openWithDefaultApp($, name)}
+                            />
+                          )}
+                        </Box>
+                        {lines && <Text dimColor>│</Text>}
+                        <Box width={SIZE_WIDTH + 2} paddingX={1}>
+                          {sizeOf[name] !== undefined && (
+                            <Text dimColor>{humanSize(sizeOf[name])}</Text>
+                          )}
+                        </Box>
+                        {lines && <Text dimColor>│</Text>}
+                        <Box width={ACTIONS_WIDTH + 2} paddingX={1} flexDirection="row" gap={2}>
+                          <Button
+                            key={`open:${name}`}
+                            label="↗️ Open"
+                            plain
+                            dimColor
+                            onPress={() => openWithDefaultApp($, name)}
+                          />
+                          <Button
+                            key={`rename:${name}`}
+                            label="📝 Rename"
+                            plain
+                            dimColor
+                            onPress={() => startRename($, name)}
+                          />
+                        </Box>
+                      </Box>
+                    ),
+                  )}
+                </Box>
               )}
               {pageCount > 1 && (
                 <Box flexDirection="row" gap={2}>

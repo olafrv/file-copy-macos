@@ -7,9 +7,12 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 🎯 Target:     ~/Projects/my-app/docs
 📋 Contents:   🙈 Hide files   ❇️ New folder...
                ⤴️ my-app/
-                  Name               Size      Actions
-               ☐  📁 2026/                     ↗️ Open  📝 Rename
-               ☐  📄 report.pdf      13 KB     ↗️ Open  📝 Rename
+               ┌──────────────────────────────────────────────────────────┐
+               │    │ Name              │ Size    │ Actions              │
+               │────┼───────────────────┼─────────┼──────────────────────│
+               │ ☐  │ 📁 2026/          │         │ ↗️ Open  📝 Rename   │
+               │ ☐  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open  📝 Rename   │
+               └──────────────────────────────────────────────────────────┘
 ⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   file-copy-macos v1.3.0
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
@@ -80,7 +83,7 @@ If a name already exists in the target, the mod asks first:
 ### Target and contents
 
 - **🎯 Target** is the project root at the start.
-- **📋 Contents** is a table with the columns tick box, Name, Size and Actions. Long names are cut with "…".
+- **📋 Contents** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - **❇️ New folder...** creates a folder in the target and opens it.

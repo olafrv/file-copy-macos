@@ -861,7 +861,20 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
     // A name too long for its column ends in "…" and fits it.
     const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
     expect(label.endsWith('…')).toBe(true)
-    expect([...label].length + 1).toBeLessThanOrEqual(100 - 13 - 2 - 9 - 18 - 4)
+    // 100 columns less the label (13) and its gap (1), then in the terminal
+    // tick (2), size (9), actions (18), padding and frame (10) and 3 column
+    // lines leave 44 for the name; on the desktop tick (5, no padding), size,
+    // actions, padding and frame (8) leave 46.
+    const nameWidth = surface === 'terminal' ? 44 : 46
+    expect([...label].length + 1).toBe(nameWidth)
+
+    // A frame on both; column lines and a header line in the terminal only,
+    // as the desktop's text font does not match its column widths.
+    expect((await ui.find({ key: 'table' }))?.props.borderStyle).toBe('single')
+    const line = ['─'.repeat(4), '─'.repeat(nameWidth + 2), '─'.repeat(11), '─'.repeat(20)]
+    const hasLines = surface === 'terminal'
+    expect((await ui.find({ type: 'Text', text: line.join('┼') })) !== undefined).toBe(hasLines)
+    expect((await ui.find({ type: 'Text', text: '│' })) !== undefined).toBe(hasLines)
 
     // The tick box ticks; the name opens the file.
     await ui.press({ key: 'tick:a.pdf' })
