@@ -680,3 +680,65 @@ test('the file list deletes ticked folders with their contents after a confirmat
   expect(fyi.length).toBe(2)
   expect(JSON.stringify(fyi[0])).toContain('1 file and 2 folders')
 })
+
+test('Contents renames a folder, never over another one', async ($, on) => {
+  const session = mock.session(on)
+  let folder = ['docs/', 'old/', 'a.pdf']
+  const moves: (readonly string[])[] = []
+  const bare = (path: string) => path.slice('/proj/'.length)
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    const [cmd] = e.argv
+    const last = e.argv[e.argv.length - 1] ?? ''
+
+    if (cmd === '/bin/ls') {
+      return { value: ran(folder.join('\n') + '\n') }
+    }
+
+    if (cmd === '/bin/test') {
+      const name = bare(last)
+      const exists = folder.includes(name) || folder.includes(`${name}/`)
+      return { value: { ...ran(''), exitCode: exists ? 0 : 1 } }
+    }
+
+    if (cmd === '/bin/mv') {
+      moves.push(e.argv)
+      const from = `${bare(e.argv[2] ?? '')}/`
+      folder = folder.map(n => (n === from ? `${bare(last)}/` : n))
+    }
+
+    return { value: ran('') }
+  })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    folder = ['docs/', 'old/', 'a.pdf']
+    moves.length = 0
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    await ui.press({ key: 'list' })
+
+    await ui.press({ key: 'rename:docs/' })
+    expect((await ui.find({ key: 'rename-field:docs/' }))?.props.value).toBe('docs')
+
+    await ui.input({ key: 'rename-field:docs/', text: 'old' })
+    expect(await ui.find({ type: 'Text', text: '"old" already exists here.' })).toBeDefined()
+    await ui.input({ key: 'rename-field:docs/', text: 'a/b' })
+    expect(await ui.find({ type: 'Text', text: 'A folder name cannot contain "/".' })).toBeDefined()
+    expect(moves).toEqual([])
+
+    await ui.input({ key: 'rename-field:docs/', text: 'Docs 2026' })
+    expect(moves).toEqual([['/bin/mv', '-n', '/proj/docs', '/proj/Docs 2026']])
+    expect(await ui.find({ key: 'rename-field:docs/' })).toBeUndefined()
+    expect(await ui.find({ key: 'dir:Docs 2026/' })).toBeDefined()
+    expect(await ui.find({ key: 'dir:docs/' })).toBeUndefined()
+
+    await ui.press({ key: 'rename:old/' })
+    await ui.press({ key: 'cancel-rename' })
+    expect(await ui.find({ key: 'rename-field:old/' })).toBeUndefined()
+    await ui.press({ key: 'list' })
+    await ui.unmount()
+  }
+
+  const fyi = session.appended().filter(r => r.message.type === 'user')
+  expect(JSON.stringify(fyi[0])).toContain('renamed the folder docs to Docs 2026')
+})

@@ -177,9 +177,15 @@ const tellClaude = async (
   })
 }
 
-const tellClaudeRename = async ($: EngineInterface, dir: string, from: string, to: string) => {
+const tellClaudeRename = async (
+  $: EngineInterface,
+  dir: string,
+  from: string,
+  to: string,
+  isFolder: boolean,
+) => {
   const note =
-    `FYI from the file-copy-macos mod: the user renamed the file ${from} to ${to} ` +
+    `FYI from the file-copy-macos mod: the user renamed the ${isFolder ? 'folder' : 'file'} ${from} to ${to} ` +
     `in the folder ${dir}.\n\n` +
     'This is information only. Do not act on it and do not reply to this note. ' +
     'Wait for the next request from the user.'
@@ -342,7 +348,11 @@ const startRename = async ($: EngineInterface, name: string | null) => {
 
 // Renames a file of the target folder. Never overwrites: a name already
 // taken is refused. The new name stays in the same folder (no "/").
-const renameFile = async ($: EngineInterface, from: string, raw: string) => {
+// `entry` is the name as Contents lists it; a folder's ends in "/".
+const renameFile = async ($: EngineInterface, entry: string, raw: string) => {
+  const isFolder = entry.endsWith('/')
+  const kind = isFolder ? 'folder' : 'file'
+  const from = entry.replace(/\/$/, '')
   const to = raw.trim()
 
   if (to === from) {
@@ -352,11 +362,11 @@ const renameFile = async ($: EngineInterface, from: string, raw: string) => {
 
   const error =
     to === ''
-      ? 'Type a file name.'
+      ? `Type a ${kind} name.`
       : to.includes('/')
-        ? 'A file name cannot contain "/".'
+        ? `A ${kind} name cannot contain "/".`
         : to === '.' || to === '..'
-          ? 'A file name cannot be "." or "..".'
+          ? `A ${kind} name cannot be "." or "..".`
           : null
 
   if (error !== null) {
@@ -382,13 +392,13 @@ const renameFile = async ($: EngineInterface, from: string, raw: string) => {
   }
 
   await startRename($, null)
-  await update($, selected, list => list.map(n => (n === from ? to : n)))
+  await update($, selected, list => list.map(n => (n === entry ? (isFolder ? `${to}/` : to) : n)))
   await update($, last, result =>
     result === null || result.root !== dir
       ? result
       : { ...result, copied: result.copied.map(n => (n === from ? to : n)) },
   )
-  await tellClaudeRename($, dir, from, to)
+  await tellClaudeRename($, dir, from, to, isFolder)
   await loadEntries($)
   $.ui.toast(`Renamed ${from} to ${to}`)
 }
@@ -823,7 +833,32 @@ export const register: Register = on => {
               )}
               {names.length === 0 && <Text dimColor>The folder is empty.</Text>}
               {names.map(name =>
-                name.endsWith('/') ? (
+                editing === name ? (
+                  <Box key={`edit:${name}`} flexDirection="column">
+                    <Box flexDirection="row" gap={1}>
+                      <Box flexGrow={1}>
+                        <Input
+                          key={`rename-field:${name}`}
+                          label="📝 Rename to:"
+                          value={name.replace(/\/$/, '')}
+                          submitLabel="📝 Rename"
+                          autoFocus
+                          onInput={() =>
+                            editError === null ? undefined : update($, renameError, () => null)
+                          }
+                          onSubmit={(value: string) => renameFile($, name, value)}
+                        />
+                      </Box>
+                      <Button
+                        key="cancel-rename"
+                        label="⏹️ Cancel"
+                        plain
+                        onPress={() => startRename($, null)}
+                      />
+                    </Box>
+                    {editError !== null && <Text color="yellow">{editError}</Text>}
+                  </Box>
+                ) : name.endsWith('/') ? (
                   <Box key={`dirrow:${name}`} flexDirection="row" gap={2}>
                     <Box flexDirection="row" gap={1}>
                       <Button
@@ -846,31 +881,13 @@ export const register: Register = on => {
                       dimColor
                       onPress={() => openWithDefaultApp($, name)}
                     />
-                  </Box>
-                ) : editing === name ? (
-                  <Box key={`edit:${name}`} flexDirection="column">
-                    <Box flexDirection="row" gap={1}>
-                      <Box flexGrow={1}>
-                        <Input
-                          key={`rename-field:${name}`}
-                          label="📝 Rename to:"
-                          value={name}
-                          submitLabel="📝 Rename"
-                          autoFocus
-                          onInput={() =>
-                            editError === null ? undefined : update($, renameError, () => null)
-                          }
-                          onSubmit={(value: string) => renameFile($, name, value)}
-                        />
-                      </Box>
-                      <Button
-                        key="cancel-rename"
-                        label="⏹️ Cancel"
-                        plain
-                        onPress={() => startRename($, null)}
-                      />
-                    </Box>
-                    {editError !== null && <Text color="yellow">{editError}</Text>}
+                    <Button
+                      key={`rename:${name}`}
+                      label="📝 Rename"
+                      plain
+                      dimColor
+                      onPress={() => startRename($, name)}
+                    />
                   </Box>
                 ) : (
                   <Box key={`row:${name}`} flexDirection="row" gap={2}>
