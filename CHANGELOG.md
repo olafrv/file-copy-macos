@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.3
+
+- The 💡 In Finder tip names the 📥 Add step: "Opt+Cmd+C -> Cmd+V in Src field -> 📥 Add". The terminal tip also says "Drag into Src field -> 📥 Add".
+
 ## 1.13.2
 
 - The 🎯 Target path is clickable: each folder from the project root down is a button that makes it the target. The part above the project stays plain text.
