@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.4
+
+- The 💡 In Finder tip is shorter and clearer: "Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add". ">" separates the steps and "or" the ways. The terminal tip starts with "Drag into Src > 📥 Add or".
+
 ## 1.13.3
 
 - The 💡 In Finder tip names the 📥 Add step: "Opt+Cmd+C -> Cmd+V in Src field -> 📥 Add". The terminal tip also says "Drag into Src field -> 📥 Add".
