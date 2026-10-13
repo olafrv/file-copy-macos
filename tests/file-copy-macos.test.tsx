@@ -860,16 +860,16 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
     const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
     expect(label.endsWith('…')).toBe(true)
     // 100 columns less the label (13) and its gap (1), then in the terminal
-    // tick (2), size (9), actions (18), padding and frame (10) and 3 column
-    // lines leave 44 for the name; on the desktop tick (5, no padding), size,
-    // actions, padding and frame (8) leave 46.
-    const nameWidth = surface === 'terminal' ? 44 : 46
+    // tick (2), size (9), actions (30), padding and frame (10) and 3 column
+    // lines leave 32 for the name; on the desktop tick (5, no padding), size,
+    // actions, padding and frame (8) leave 34.
+    const nameWidth = surface === 'terminal' ? 32 : 34
     expect([...label].length + 1).toBe(nameWidth)
 
     // A frame on both; column lines and a header line in the terminal only,
     // as the desktop's text font does not match its column widths.
     expect((await ui.find({ key: 'table' }))?.props.borderStyle).toBe('single')
-    const line = ['─'.repeat(4), '─'.repeat(nameWidth + 2), '─'.repeat(11), '─'.repeat(20)]
+    const line = ['─'.repeat(4), '─'.repeat(nameWidth + 2), '─'.repeat(11), '─'.repeat(32)]
     const hasLines = surface === 'terminal'
     expect((await ui.find({ type: 'Text', text: line.join('┼') })) !== undefined).toBe(hasLines)
     expect((await ui.find({ type: 'Text', text: '│' })) !== undefined).toBe(hasLines)
@@ -1046,6 +1046,72 @@ test('the Shortcuts row shows the clock on both surfaces, the version on the des
     expect(parts).toEqual(
       surface === 'desktop' ? ['Tue 13.10.2026 14:32 CEST', ' · '] : ['Tue 13.10.2026 14:32 CEST'],
     )
+    await ui.unmount()
+  }
+})
+
+test('Mention puts @paths into the prompt; the header tick selects all shown', async ($, on) => {
+  const fills: { text: string; mode: string }[] = []
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/bin/ls') {
+      return { value: ran(e.argv[2] === '/proj' ? 'docs/\na.pdf\nMy File.txt\n' : 'q1.csv\n') }
+    }
+
+    return { value: ran('') }
+  })
+  on('prompt.fill', ($, e) => {
+    fills.push({ text: e.text, mode: e.mode })
+    return { isFilled: true, text: e.text, cursor: e.text.length }
+  })
+
+  // Clear, opening a folder, going up and closing the list each draw a new
+  // filter field.
+  let fieldId = 0
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    fills.length = 0
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    await ui.press({ key: 'list' })
+
+    // One item, at the cursor; a path with a space is quoted.
+    await ui.press({ key: 'mention:a.pdf' })
+    await ui.press({ key: 'mention:My File.txt' })
+    expect(fills).toEqual([
+      { text: '@a.pdf ', mode: 'insert' },
+      { text: '@"My File.txt" ', mode: 'insert' },
+    ])
+
+    // The header tick ticks all shown, and again unticks them.
+    expect((await ui.find({ key: 'tick-all' }))?.props.label).toBe('☐')
+    await ui.press({ key: 'tick-all' })
+    expect((await ui.find({ key: 'tick-all' }))?.props.label).toBe('☑')
+    expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe('☑')
+    expect((await ui.find({ key: 'delete-selected' }))?.props.label).toBe('❌ Delete selected (3)')
+    await ui.press({ key: 'tick-all' })
+    expect(await ui.find({ key: 'delete-selected' })).toBeUndefined()
+
+    // With a filter, only the matching items are ticked.
+    await ui.input({ key: `filter-${fieldId}`, text: 'a.', kind: 'change' })
+    await ui.press({ key: 'tick-all' })
+    expect((await ui.find({ key: 'mention-selected' }))?.props.label).toBe('💬 Mention selected (1)')
+    await ui.press({ key: 'mention-selected' })
+    expect(fills[2]).toEqual({ text: '@a.pdf ', mode: 'insert' })
+    await ui.press({ key: 'tick-all' })
+    await ui.press({ key: 'clear-filter' })
+    fieldId += 1
+
+    // In a subfolder the path starts at the project root.
+    await ui.press({ key: 'dir:docs/' })
+    fieldId += 1
+    await ui.press({ key: 'mention:q1.csv' })
+    expect(fills[3]).toEqual({ text: '@docs/q1.csv ', mode: 'insert' })
+    await ui.press({ key: 'up' })
+    fieldId += 1
+
+    await ui.press({ key: 'list' })
+    fieldId += 1
     await ui.unmount()
   }
 })

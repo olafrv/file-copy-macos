@@ -7,12 +7,13 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 🎯 Target:     ~/Projects/my-app/docs   ↗️ Open
 📋 Contents:   🙈 Hide   ❇️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
                ⤴️ my-app/
-               ┌──────────────────────────────────────────────────────────┐
-               │    │ Name ▲            │ Size    │ Actions              │
-               │────┼───────────────────┼─────────┼──────────────────────│
-               │ ☐  │ 📁 2026/          │         │ ↗️ Open  📝 Rename   │
-               │ ☐  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open  📝 Rename   │
-               └──────────────────────────────────────────────────────────┘
+               ┌──────────────────────────────────────────────────────────────────────┐
+               │ ☐  │ Name ▲            │ Size    │ Actions                          │
+               │────┼───────────────────┼─────────┼──────────────────────────────────│
+               │ ☐  │ 📁 2026/          │         │ ↗️ Open  📝 Rename  💬 Mention   │
+               │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open  📝 Rename  💬 Mention   │
+               └──────────────────────────────────────────────────────────────────────┘
+               ❌ Delete selected (1)  💬 Mention selected (1)
 ⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · v1.6.2
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
@@ -91,8 +92,10 @@ If a name already exists in the target, the mod asks first:
 - **Filter:** is always shown. It shows only items whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
 - Click **Name** or **Size** in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
 - The list shows 4 items per page. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
-- Each row has **↗️ Open** (default macOS app for a file, Finder for a folder) and **📝 Rename**.
-- Tick files or folders (☐) and use **❌ Delete selected** to move them to the Trash. A folder goes to the Trash with all its contents.
+- Each row has **↗️ Open** (default macOS app for a file, Finder for a folder), **📝 Rename** and **💬 Mention**.
+- **💬 Mention** puts `@path` (relative to the project) at the cursor in the prompt, so you can ask Claude about the item. A path with a space is quoted: `@"docs/My File.pdf"`.
+- Tick files or folders (☐). The ☐ in the header ticks all items that match the filter, on all pages; a second click unticks them.
+- **❌ Delete selected** moves the ticked items to the Trash. A folder goes to the Trash with all its contents. **💬 Mention selected** puts all ticked items into the prompt.
 
 ### Clock
 

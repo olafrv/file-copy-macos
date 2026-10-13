@@ -141,12 +141,13 @@ const HELP_URL = 'https://github.com/olafrv/file-copy-macos#readme'
 const PAGE_SIZE = 4
 
 // The file list's columns, in terminal cells: the tick box, the size
-// ("999 KB"), the actions ("↗️ Open  📝 Rename") and the least the name gets.
+// ("999 KB"), the actions ("↗️ Open  📝 Rename  💬 Mention") and the least the
+// name gets.
 const TICK_WIDTH = 2
 // The desktop draws a Button with its own padding: the tick box needs more room.
 const DESKTOP_TICK_WIDTH = 5
 const SIZE_WIDTH = 9
-const ACTIONS_WIDTH = 18
+const ACTIONS_WIDTH = 30
 const MIN_NAME_WIDTH = 16
 
 // An icon and a name cut to `width` cells with "…"; the icon takes 2 cells.
@@ -521,6 +522,33 @@ const filterBy = async ($: EngineInterface, value: string) => {
 
   if (value.trim() !== '' && !(await read($, isListOpen))) {
     await toggleList($)
+  }
+}
+
+// Ticks every item shown (all pages, the filter applied), or, when all of
+// them are ticked, unticks them.
+const toggleAll = async ($: EngineInterface, shown: readonly string[]) => {
+  await update($, isConfirming, () => false)
+  await update($, selected, list =>
+    shown.every(n => list.includes(n))
+      ? list.filter(n => !shown.includes(n))
+      : [...list, ...shown.filter(n => !list.includes(n))],
+  )
+}
+
+// Puts "@path" for each item, relative to the project, at the cursor in the
+// prompt, so the person can ask Claude about them. A path with a space is
+// quoted.
+const mention = async ($: EngineInterface, names: readonly string[]) => {
+  const dir = await read($, subdir)
+  const text = names
+    .map(name => (dir === '' ? name : `${dir}/${name}`))
+    .map(path => (/\s/.test(path) ? `@"${path}"` : `@${path}`))
+    .join(' ')
+  const filled = await $.prompt.fill({ text: `${text} `, mode: 'insert' })
+
+  if (!filled.isFilled) {
+    $.ui.toast('Could not write into the prompt now')
   }
 }
 
@@ -1056,7 +1084,14 @@ export const register: Register = on => {
                   borderDimColor
                 >
                   <Box key="table-head" flexDirection="row">
-                    <Box width={lines ? tickWidth + 2 : tickWidth} />
+                    <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
+                      <Button
+                        key="tick-all"
+                        label={view.every(n => ticked.includes(n)) ? '☑' : '☐'}
+                        plain
+                        onPress={() => toggleAll($, view)}
+                      />
+                    </Box>
                     {lines && <Text dimColor>│</Text>}
                     <Box width={nameWidth + 2} paddingX={1}>
                       <Button
@@ -1167,6 +1202,13 @@ export const register: Register = on => {
                             dimColor
                             onPress={() => startRename($, name)}
                           />
+                          <Button
+                            key={`mention:${name}`}
+                            label="💬 Mention"
+                            plain
+                            dimColor
+                            onPress={() => mention($, [name])}
+                          />
                         </Box>
                       </Box>
                     ),
@@ -1174,11 +1216,16 @@ export const register: Register = on => {
                 </Box>
               )}
               {ticked.length > 0 && !confirming && (
-                <Box flexDirection="row">
+                <Box flexDirection="row" gap={1}>
                   <Button
                     key="delete-selected"
                     label={`❌ Delete selected (${ticked.length})`}
                     onPress={() => update($, isConfirming, () => true)}
+                  />
+                  <Button
+                    key="mention-selected"
+                    label={`💬 Mention selected (${ticked.length})`}
+                    onPress={() => mention($, ticked)}
                   />
                 </Box>
               )}
