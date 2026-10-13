@@ -14,7 +14,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
                │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open  📝 Rename  💬 Mention   │
                └──────────────────────────────────────────────────────────────────────┘
                ❌ Delete selected (1)  💬 Mention selected (1)
-⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · v1.6.2
+⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · v1.7.0
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
