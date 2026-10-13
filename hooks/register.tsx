@@ -17,7 +17,7 @@ import {
 
 // The mod's version, read from its own plugin.json at session start.
 const version = atom({ plugin: 'file-copy-macos', key: 'version' } as const, null)
-// The clock: the minute on show (ms since the epoch, 0 before the first
+// The clock: the second on show (ms since the epoch, 0 before the first
 // tick), and the local zone's offset from UTC in minutes and its name.
 const clockNow = atom({ plugin: 'file-copy-macos', key: 'clockNow' } as const, 0)
 const zoneOffset = atom({ plugin: 'file-copy-macos', key: 'zoneOffset' } as const, 0)
@@ -173,6 +173,8 @@ const clearFilter = async ($: EngineInterface) => {
 
 // Wide enough for "⚡ Shortcuts:" (an icon is 2 columns), so the rows line up.
 const LABEL_WIDTH = 13
+// The desktop draws the labels in a narrower font: 13 cells left a wide gap.
+const DESKTOP_LABEL_WIDTH = 11
 
 const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use Files... or Folder...'
 
@@ -847,28 +849,29 @@ const loadZone = async ($: EngineInterface) => {
   await update($, zoneName, () => zone.name)
 }
 
-const MINUTE = 60_000
+const SECOND = 1000
+const HOUR = 3_600_000
 
-// Stores the time once a minute, on the minute, so the band redraws the
+// Stores the time once a second, on the second, so the band redraws the
 // clock; the zone is asked again each hour, for the change of summer time.
 const startClock = async ($: EngineInterface) => {
   const tick = async () => {
     const now = await $.clock.now()
 
-    if (now % (60 * MINUTE) < MINUTE) {
+    if (now % HOUR < SECOND) {
       await loadZone($)
     }
 
-    await update($, clockNow, () => now - (now % MINUTE))
+    await update($, clockNow, () => now - (now % SECOND))
   }
 
   await loadZone($)
   await tick()
   const now = await $.clock.now()
 
-  $.clock.after(MINUTE - (now % MINUTE), () => {
+  $.clock.after(SECOND - (now % SECOND), () => {
     void tick()
-    $.clock.every(MINUTE, () => void tick())
+    $.clock.every(SECOND, () => void tick())
   })
 }
 
@@ -899,11 +902,11 @@ export const register: Register = on => {
     const root = await $.session.root()
     const dir = await read($, subdir)
     const modVersion = await read($, version)
-    const shownMinute = await read($, clockNow)
+    const shownSecond = await read($, clockNow)
     const clock =
-      shownMinute === 0
+      shownSecond === 0
         ? null
-        : formatClock(shownMinute, await read($, zoneOffset), await read($, zoneName))
+        : formatClock(shownSecond, await read($, zoneOffset), await read($, zoneName))
     const target = dir === '' ? root : `${root}/${dir}`
     const naming = await read($, isNamingFolder)
     const editing = await read($, renaming)
@@ -935,7 +938,14 @@ export const register: Register = on => {
     const tickWidth = lines ? TICK_WIDTH : DESKTOP_TICK_WIDTH
     const frame = tickWidth + SIZE_WIDTH + ACTIONS_WIDTH + (lines ? 13 : 8)
     // The Name column takes what the label, its gap and the other columns leave.
-    const nameWidth = Math.max(MIN_NAME_WIDTH, e.props.bodyColumns - LABEL_WIDTH - 1 - frame)
+    const labelWidth = lines ? LABEL_WIDTH : DESKTOP_LABEL_WIDTH
+    // The desktop's buttons have a frame: buttons in rows one above the other
+    // touched. A part of a row keeps them apart; the terminal needs none.
+    const rowSpace = lines ? 0 : 0.3
+    // The desktop draws "☐" from a text font, narrow and cut at the left;
+    // color emoji fill their square there.
+    const tick = (isOn: boolean) => (lines ? (isOn ? '☑' : '☐') : isOn ? '✅' : '⬜')
+    const nameWidth = Math.max(MIN_NAME_WIDTH, e.props.bodyColumns - labelWidth - 1 - frame)
     const tableWidth = nameWidth + frame
     const showResult = result !== null && !hidden && !isBusy && ask === null
     // The Hide button sits on the last result line drawn.
@@ -956,7 +966,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1} alignItems="center">
-          <Box width={LABEL_WIDTH}>
+          <Box width={labelWidth}>
             <Text>📎 Source(s):</Text>
           </Box>
           <Box flexGrow={1}>
@@ -1029,13 +1039,13 @@ export const register: Register = on => {
         </Box>
         {message !== null && (
           <Box flexDirection="row" gap={1}>
-            <Box width={LABEL_WIDTH} />
+            <Box width={labelWidth} />
             <Text color="yellow">{message}</Text>
           </Box>
         )}
         {count > 0 && (
           <Box flexDirection="row" gap={1}>
-            <Box width={LABEL_WIDTH} />
+            <Box width={labelWidth} />
             <Box flexDirection="column" flexGrow={1}>
               {paths.map(path => (
                 <Button
@@ -1048,32 +1058,18 @@ export const register: Register = on => {
             </Box>
           </Box>
         )}
-        <Box flexDirection="row" gap={1}>
-          <Box width={LABEL_WIDTH}>
+        <Box flexDirection="row" gap={1} marginTop={rowSpace}>
+          <Box width={labelWidth}>
             <Text>🎯 Target:</Text>
           </Box>
           <Text dimColor>{shortPath(target)}</Text>
-          {/* Side by side as in the table's Actions: no gap on the desktop. */}
-          <Box flexDirection="row" gap={lines ? 1 : 0}>
-            <Button
-              key="open-target"
-              label="↗️ Open"
-              plain
-              dimColor
-              onPress={() => openWithDefaultApp($, '')}
-            />
-            <Button
-              key="finder-target"
-              label="📌 Finder"
-              plain
-              dimColor
-              onPress={() => showInFinder($, '')}
-            />
-          </Box>
+          {/* Real buttons, as Files... and Folder... in the row above. */}
+          <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
+          <Button key="finder-target" label="📌 Finder" onPress={() => showInFinder($, '')} />
         </Box>
-        <Box flexDirection="row" gap={1}>
-          <Box width={LABEL_WIDTH}>
-            <Text>🗂️ Contents:</Text>
+        <Box flexDirection="row" gap={1} marginTop={rowSpace}>
+          <Box width={labelWidth}>
+            <Text>📚 Contents:</Text>
           </Box>
           <Button
             key="list"
@@ -1084,7 +1080,7 @@ export const register: Register = on => {
           {!naming && (
             <Button
               key="new-folder"
-              label="❇️ New folder..."
+              label="🗂️ New folder..."
               plain
               onPress={() => update($, isNamingFolder, () => true)}
             />
@@ -1128,15 +1124,15 @@ export const register: Register = on => {
         </Box>
         {naming && (
           <Box flexDirection="row" gap={1}>
-            <Box width={LABEL_WIDTH} />
+            <Box width={labelWidth} />
             <Box flexDirection="column" flexGrow={1}>
               <Box flexDirection="row" gap={1}>
                 <Box flexGrow={1}>
                   <Input
                     key="folder-name"
-                    label="❇️ New folder"
+                    label="🗂️ New folder"
                     placeholder="Name, then Enter"
-                    submitLabel="❇️ Create"
+                    submitLabel="🗂️ Create"
                     autoFocus
                     onInput={() => (nameError === null ? undefined : update($, folderError, () => null))}
                     onSubmit={(value: string) => createFolder($, value)}
@@ -1158,7 +1154,7 @@ export const register: Register = on => {
         )}
         {listOpen && (
           <Box flexDirection="row" gap={1}>
-            <Box width={LABEL_WIDTH} />
+            <Box width={labelWidth} />
             <Box flexDirection="column" flexGrow={1}>
               {dir !== '' && (
                 <Button
@@ -1184,7 +1180,7 @@ export const register: Register = on => {
                     <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
                       <Button
                         key="tick-all"
-                        label={view.every(n => ticked.includes(n)) ? '☑' : '☐'}
+                        label={tick(view.every(n => ticked.includes(n)))}
                         plain
                         onPress={() => toggleAll($, view)}
                       />
@@ -1252,7 +1248,7 @@ export const register: Register = on => {
                         <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
                           <Button
                             key={`tick:${name}`}
-                            label={ticked.includes(name) ? '☑' : '☐'}
+                            label={tick(ticked.includes(name))}
                             plain
                             onPress={() => toggleSelected($, name)}
                           />
@@ -1369,7 +1365,7 @@ export const register: Register = on => {
           </Box>
         )}
         <Box flexDirection="row" gap={1}>
-          <Box width={LABEL_WIDTH}>
+          <Box width={labelWidth}>
             <Text>⚡ Shortcuts:</Text>
           </Box>
           <Box flexGrow={1} flexShrink={1}>
@@ -1392,7 +1388,7 @@ export const register: Register = on => {
         </Box>
         {ask !== null && (
           <Box flexDirection="row" gap={1}>
-            <Box width={LABEL_WIDTH}>
+            <Box width={labelWidth}>
               <Text color="yellow">⚠ Exists:</Text>
             </Box>
             <Box flexDirection="column" flexGrow={1} flexShrink={1}>
@@ -1410,7 +1406,7 @@ export const register: Register = on => {
         )}
         {showResult && result.copied.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={LABEL_WIDTH}>
+            <Box width={labelWidth}>
               <Text color="green">✅ Copied:</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
@@ -1430,7 +1426,7 @@ export const register: Register = on => {
         )}
         {showResult && confirmingLast && result.copied.length > 0 && (
           <Box flexDirection="row" gap={1}>
-            <Box width={LABEL_WIDTH} />
+            <Box width={labelWidth} />
             <Box flexDirection="column" flexGrow={1}>
               <Text color="yellow">
                 {result.copied.length === 1
@@ -1457,7 +1453,7 @@ export const register: Register = on => {
         )}
         {showResult && result.skipped.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={LABEL_WIDTH}>
+            <Box width={labelWidth}>
               <Text dimColor>⏭️ Skipped:</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
@@ -1470,7 +1466,7 @@ export const register: Register = on => {
         )}
         {showResult && result.failed.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={LABEL_WIDTH}>
+            <Box width={labelWidth}>
               <Text color="yellow">⚠ Failed:</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>

@@ -17,6 +17,10 @@ const BAND = {
   },
 } as const
 
+// The tick box as each surface draws it: emoji on the desktop.
+const box = (surface: 'terminal' | 'desktop', isOn: boolean) =>
+  surface === 'terminal' ? (isOn ? '☑' : '☐') : isOn ? '✅' : '⬜'
+
 const ran = (stdout: string) => ({
   exitCode: 0,
   stdout,
@@ -529,7 +533,7 @@ test('the Contents label and folder rows use emoji on every surface', async ($, 
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: '🗂️ Contents:' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '📚 Contents:' })).toBeDefined()
     await ui.press({ key: 'list' })
     expect((await ui.find({ key: 'dir:docs/' }))?.props.label).toBe('📁 docs/')
     expect(await ui.find({ type: 'Svg' })).toBeUndefined()
@@ -853,19 +857,19 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
     expect((await ui.find({ key: 'sort-size' }))?.props.label).toBe('Size')
     expect(await ui.find({ type: 'Text', text: 'Actions' })).toBeDefined()
 
-    expect((await ui.find({ key: 'tick:a.pdf' }))?.props.label).toBe('☐')
-    expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe('☐')
+    expect((await ui.find({ key: 'tick:a.pdf' }))?.props.label).toBe(box(surface, false))
+    expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe(box(surface, false))
     expect(await ui.find({ key: 'rename:docs/' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '13 KB' })).toBeDefined()
 
     // A name too long for its column ends in "…" and fits it.
     const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
     expect(label.endsWith('…')).toBe(true)
-    // 100 columns less the label (13) and its gap (1), then in the terminal
-    // tick (2), size (9), actions (39), padding and frame (10) and 3 column
-    // lines leave 23 for the name; on the desktop tick (5, no padding), size,
-    // actions, padding and frame (8) leave 25.
-    const nameWidth = surface === 'terminal' ? 23 : 25
+    // 100 columns less the label and its gap (1), then in the terminal label
+    // (13), tick (2), size (9), actions (39), padding and frame (10) and 3
+    // column lines leave 23 for the name; on the desktop label (11), tick (5,
+    // no padding), size, actions, padding and frame (8) leave 27.
+    const nameWidth = surface === 'terminal' ? 23 : 27
     expect([...label].length + 1).toBe(nameWidth)
 
     // A frame on both; column lines and a header line in the terminal only,
@@ -878,7 +882,7 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
 
     // The tick box ticks; the name opens the file.
     await ui.press({ key: 'tick:a.pdf' })
-    expect((await ui.find({ key: 'tick:a.pdf' }))?.props.label).toBe('☑')
+    expect((await ui.find({ key: 'tick:a.pdf' }))?.props.label).toBe(box(surface, true))
     expect(opened).toEqual([])
     await ui.press({ key: 'file:a.pdf' })
     expect(opened).toEqual(['/proj/a.pdf'])
@@ -1020,11 +1024,11 @@ test('the clock reads the zone from macOS and shows date, time and zone', async 
   expect(parseZone('-0330 NST')).toEqual({ offset: -210, name: 'NST' })
   expect(parseZone('')).toEqual({ offset: 0, name: 'UTC' })
 
-  // 12:32:15 UTC is 14:32 in CEST; seconds are not shown.
-  expect(formatClock(Date.UTC(2026, 9, 13, 12, 32, 15), 120, 'CEST')).toBe('Tue 13.10.2026 14:32 CEST')
+  // 12:32:15 UTC is 14:32:15 in CEST.
+  expect(formatClock(Date.UTC(2026, 9, 13, 12, 32, 15), 120, 'CEST')).toBe('Tue 13.10.2026 14:32:15 CEST')
   // Late UTC evening is already the next day east of UTC, and the day before west of it.
-  expect(formatClock(Date.UTC(2025, 11, 31, 23, 30), 60, 'CET')).toBe('Thu 01.01.2026 00:30 CET')
-  expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('Wed 31.12.2025 21:00 EST')
+  expect(formatClock(Date.UTC(2025, 11, 31, 23, 30), 60, 'CET')).toBe('Thu 01.01.2026 00:30:00 CET')
+  expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('Wed 31.12.2025 21:00:00 EST')
 })
 
 test('the Shortcuts row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
@@ -1038,15 +1042,15 @@ test('the Shortcuts row shows the clock on both surfaces, the version on the des
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32:15 CEST' })).toBeDefined()
     // On the desktop a middle dot, then the version as a link, all in the
     // clock's own Text, so no gap of the row widens the space before the dot.
     const version = await ui.find({ type: 'Link' })
     expect(version?.children).toEqual(surface === 'desktop' ? ['v9.8.7'] : undefined)
-    const clock = await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })
+    const clock = await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32:15 CEST' })
     const parts = (clock?.children ?? []).filter(c => typeof c === 'string')
     expect(parts).toEqual(
-      surface === 'desktop' ? ['Tue 13.10.2026 14:32 CEST', ' · '] : ['Tue 13.10.2026 14:32 CEST'],
+      surface === 'desktop' ? ['Tue 13.10.2026 14:32:15 CEST', ' · '] : ['Tue 13.10.2026 14:32:15 CEST'],
     )
     await ui.unmount()
   }
@@ -1086,10 +1090,10 @@ test('Ask puts @paths into the prompt; the header tick selects all shown', async
     ])
 
     // The header tick ticks all shown, and again unticks them.
-    expect((await ui.find({ key: 'tick-all' }))?.props.label).toBe('☐')
+    expect((await ui.find({ key: 'tick-all' }))?.props.label).toBe(box(surface, false))
     await ui.press({ key: 'tick-all' })
-    expect((await ui.find({ key: 'tick-all' }))?.props.label).toBe('☑')
-    expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe('☑')
+    expect((await ui.find({ key: 'tick-all' }))?.props.label).toBe(box(surface, true))
+    expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe(box(surface, true))
     expect(await ui.find({ type: 'Text', text: '3 selected:' })).toBeDefined()
     await ui.press({ key: 'tick-all' })
     expect(await ui.find({ key: 'delete-selected' })).toBeUndefined()

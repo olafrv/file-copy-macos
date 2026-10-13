@@ -182,13 +182,14 @@ export const parseZone = (text: string): { offset: number; name: string } => {
   return { offset: match[1] === '-' ? -minutes : minutes, name: match[4] ?? 'UTC' }
 }
 
-/** A moment as "Mon 13.10.2026 14:32 CEST", in the zone given. */
+/** A moment as "Tue 13.10.2026 14:32:15 CEST", in the zone given. */
 export const formatClock = (ms: number, offset: number, zone: string): string => {
   const d = new Date(ms + offset * 60_000)
   const two = (n: number) => String(n).padStart(2, '0')
 
   return (
     `${WEEKDAYS[d.getUTCDay()]} ${two(d.getUTCDate())}.${two(d.getUTCMonth() + 1)}.` +
-    `${d.getUTCFullYear()} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} ${zone}`
+    `${d.getUTCFullYear()} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}:` +
+    `${two(d.getUTCSeconds())} ${zone}`
   )
 }

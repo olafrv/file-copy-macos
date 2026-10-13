@@ -5,7 +5,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 ```
 📎 Source(s):  [Paste paths -> Enter] 📥 Add   📄 Files...  📂 Folder...  📥 Paste  ⬇️ Latest download
 🎯 Target:     ~/Projects/my-app/docs   ↗️ Open  📌 Finder
-🗂️ Contents:   🙈 Hide   ❇️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
+📚 Contents:   🙈 Hide   🗂️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
                ⤴️ my-app/
                ┌────────────────────────────────────────────────────────────────────────────┐
                │ ☐  │ Name ▲            │ Size    │ Actions                                │
@@ -14,7 +14,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
                │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
                └────────────────────────────────────────────────────────────────────────────┘
                1 selected:  ❌ Delete  💬 Ask  📋 Copy
-⚡ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · v1.9.0
+⚡ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32:15 CEST · v1.9.0
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -86,10 +86,10 @@ If a name already exists in the target, the mod asks first:
 ### Target and contents
 
 - **🎯 Target** is the project root at the start. **↗️ Open** opens the target folder in Finder. **📌 Finder** shows it in its parent folder, selected.
-- **🗂️ Contents** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
+- **📚 Contents** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
-- **❇️ New folder...** creates a folder in the target and opens it.
+- **🗂️ New folder...** creates a folder in the target and opens it.
 - **Filter:** is always shown. It shows only items whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
 - Click **Name** or **Size** in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
 - The list shows 4 items per page. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
@@ -100,7 +100,7 @@ If a name already exists in the target, the mod asks first:
   - **📝 Ren:** renames the item.
   - **📋 Copy:** puts the item on the clipboard as a file. Press Cmd+V in Finder, on the Desktop, in Mail or in Slack to paste it.
 - **💬 Ask** puts `@path` (relative to the project) at the cursor in the prompt, so you can ask Claude about the item. A path with a space is quoted: `@"docs/My File.pdf"`.
-- Tick files or folders (☐). The ☐ in the header ticks all items that match the filter, on all pages; a second click unticks them.
+- Tick files or folders (☐, on the desktop ⬜). The tick box in the header ticks all items that match the filter, on all pages; a second click unticks them.
 - With items ticked, a row under the table offers:
   - **❌ Delete:** moves them to the Trash. A folder goes to the Trash with all its contents.
   - **💬 Ask:** puts all of them into the prompt.
@@ -108,7 +108,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Clock
 
-The Shortcuts row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
+The Shortcuts row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32:15 CEST`. It changes every second. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
 
 ### What Claude is told
 
