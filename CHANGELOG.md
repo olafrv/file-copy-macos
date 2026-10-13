@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.2
+
+- The 🎯 Target path is clickable: each folder from the project root down is a button that makes it the target. The part above the project stays plain text.
+
 ## 1.13.1
 
 - README: the Requirements section lists every macOS command the mod uses, with the features that use it.
