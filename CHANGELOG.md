@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.1
+
+- README: the Requirements section lists every macOS command the mod uses, with the features that use it.
+
 ## 1.13.0
 
 - The mod now uses Claude Code's own file access (`$.fs`) to list folders, read sizes and check names, instead of the commands `ls`, `stat`, `test` and `find`. File names arrive exactly as they are, so no name can be misread.
