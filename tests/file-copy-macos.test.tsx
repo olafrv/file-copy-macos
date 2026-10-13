@@ -3,7 +3,7 @@
 
 import { expect, mock, test } from 'claude-code/testing'
 
-import { humanSize, parsePaths, toFieldText } from '../hooks/paths'
+import { humanSize, parsePaths, toFieldText, viewEntries } from '../hooks/paths'
 
 const BAND = {
   component: 'AbovePrompt',
@@ -538,7 +538,7 @@ test('the Contents label and folder rows use emoji on every surface', async ($, 
   }
 })
 
-test('Open opens a file with its default app and a folder in Finder', async ($, on) => {
+test('Open opens a file with its default app, a folder and the target in Finder', async ($, on) => {
   const opened: (readonly string[])[] = []
 
   on('session.root', () => ({ value: '/proj' }))
@@ -554,9 +554,11 @@ test('Open opens a file with its default app and a folder in Finder', async ($, 
   await ui.press({ key: 'list' })
   await ui.press({ key: 'open:a.pdf' })
   await ui.press({ key: 'open:docs/' })
+  await ui.press({ key: 'open-target' })
   expect(opened).toEqual([
     ['/usr/bin/open', '/proj/a.pdf'],
     ['/usr/bin/open', '/proj/docs'],
+    ['/usr/bin/open', '/proj'],
   ])
   expect(await ui.find({ type: 'Text', text: '/proj/docs' })).toBeUndefined()
   await ui.press({ key: 'list' })
@@ -749,8 +751,8 @@ test('Contents renames a folder, never over another one', async ($, on) => {
   expect(JSON.stringify(fyi[0])).toContain('renamed the folder docs to Docs 2026')
 })
 
-test('Contents shows 5 entries per page and keeps ticks across pages', async ($, on) => {
-  const start = ['d1/', 'd2/', ...Array.from({ length: 9 }, (_, i) => `f${i + 1}.txt`)]
+test('Contents shows 4 entries per page and keeps ticks across pages', async ($, on) => {
+  const start = ['d1/', 'd2/', ...Array.from({ length: 7 }, (_, i) => `f${i + 1}.txt`)]
   const trashed: string[] = []
   let folder = [...start]
 
@@ -778,49 +780,49 @@ test('Contents shows 5 entries per page and keeps ticks across pages', async ($,
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
     await ui.press({ key: 'list' })
 
-    // Page 1: the 2 folders and f1 to f3; no Prev.
-    expect(await ui.find({ type: 'Text', text: 'Page 1 of 3 (11 items)' })).toBeDefined()
+    // Page 1: the 2 folders, f1 and f2; no Prev.
+    expect(await ui.find({ type: 'Text', text: '1/3 (#9)' })).toBeDefined()
     expect(await ui.find({ key: 'dir:d1/' })).toBeDefined()
-    expect(await ui.find({ key: 'file:f3.txt' })).toBeDefined()
-    expect(await ui.find({ key: 'file:f4.txt' })).toBeUndefined()
+    expect(await ui.find({ key: 'file:f2.txt' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f3.txt' })).toBeUndefined()
     expect(await ui.find({ key: 'page-prev' })).toBeUndefined()
 
     await ui.press({ key: 'tick:f1.txt' })
     await ui.press({ key: 'page-next' })
-    expect(await ui.find({ type: 'Text', text: 'Page 2 of 3 (11 items)' })).toBeDefined()
-    expect(await ui.find({ key: 'file:f4.txt' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '2/3 (#9)' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f6.txt' })).toBeDefined()
     expect(await ui.find({ key: 'file:f1.txt' })).toBeUndefined()
 
     await ui.press({ key: 'page-next' })
-    expect(await ui.find({ key: 'file:f9.txt' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f7.txt' })).toBeDefined()
     expect(await ui.find({ key: 'page-next' })).toBeUndefined()
 
     // A tick from page 1 and one from page 3 are deleted together.
-    await ui.press({ key: 'tick:f9.txt' })
+    await ui.press({ key: 'tick:f7.txt' })
     expect(await ui.find({ key: 'delete-selected' })).toBeDefined()
     await ui.press({ key: 'delete-selected' })
     await ui.press({ key: 'confirm-delete' })
-    expect([...trashed].sort()).toEqual(['/proj/f1.txt', '/proj/f9.txt'])
+    expect([...trashed].sort()).toEqual(['/proj/f1.txt', '/proj/f7.txt'])
 
-    // 9 entries left: page 3 is gone, the last page shows.
-    expect(await ui.find({ type: 'Text', text: 'Page 2 of 2 (9 items)' })).toBeDefined()
-    expect(await ui.find({ key: 'file:f8.txt' })).toBeDefined()
+    // 7 entries left: page 3 is gone, the last page shows.
+    expect(await ui.find({ type: 'Text', text: '2/2 (#7)' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f6.txt' })).toBeDefined()
 
     await ui.press({ key: 'page-prev' })
-    expect(await ui.find({ type: 'Text', text: 'Page 1 of 2 (9 items)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
 
     // An empty folder has no page row; going up starts on page 1.
     await ui.press({ key: 'dir:d1/' })
     expect(await ui.find({ type: 'Text', text: 'The folder is empty.' })).toBeDefined()
     expect(await ui.find({ key: 'page-next' })).toBeUndefined()
     await ui.press({ key: 'up' })
-    expect(await ui.find({ type: 'Text', text: 'Page 1 of 2 (9 items)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
 
     // Closing and opening the list starts on page 1 again.
     await ui.press({ key: 'page-next' })
     await ui.press({ key: 'list' })
     await ui.press({ key: 'list' })
-    expect(await ui.find({ type: 'Text', text: 'Page 1 of 2 (9 items)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
 
     await ui.press({ key: 'list' })
     await ui.unmount()
@@ -855,9 +857,9 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
     await ui.press({ key: 'list' })
 
-    for (const text of ['Name', 'Size', 'Actions']) {
-      expect(await ui.find({ type: 'Text', text })).toBeDefined()
-    }
+    expect((await ui.find({ key: 'sort-name' }))?.props.label).toBe('Name ▲')
+    expect((await ui.find({ key: 'sort-size' }))?.props.label).toBe('Size')
+    expect(await ui.find({ type: 'Text', text: 'Actions' })).toBeDefined()
 
     expect((await ui.find({ key: 'tick:a.pdf' }))?.props.label).toBe('☐')
     expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe('☐')
@@ -892,4 +894,131 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
     await ui.press({ key: 'list' })
     await ui.unmount()
   }
+})
+
+test('the list filters by name and sorts folders first, by name or size', async () => {
+  const names = ['b/', 'A/', 'f10.txt', 'f2.txt', 'Big.iso', 'small.md']
+  const sizes = { 'f10.txt': 500, 'f2.txt': 20, 'Big.iso': 9000, 'small.md': 1 }
+
+  expect(viewEntries(names, sizes, '', 'name', false)).toEqual([
+    'A/', 'b/', 'Big.iso', 'f2.txt', 'f10.txt', 'small.md',
+  ])
+  expect(viewEntries(names, sizes, '', 'name', true)).toEqual([
+    'b/', 'A/', 'small.md', 'f10.txt', 'f2.txt', 'Big.iso',
+  ])
+  // By size the folders keep the name order.
+  expect(viewEntries(names, sizes, '', 'size', false)).toEqual([
+    'A/', 'b/', 'small.md', 'f2.txt', 'f10.txt', 'Big.iso',
+  ])
+  expect(viewEntries(names, sizes, '', 'size', true)).toEqual([
+    'A/', 'b/', 'Big.iso', 'f10.txt', 'f2.txt', 'small.md',
+  ])
+  // The filter ignores case and the folder's "/".
+  expect(viewEntries(names, sizes, ' F1 ', 'name', false)).toEqual(['f10.txt'])
+  expect(viewEntries(names, sizes, 'b/', 'name', false)).toEqual([])
+  expect(viewEntries(names, sizes, 'b', 'name', false)).toEqual(['b/', 'Big.iso'])
+})
+
+test('Contents sorts by a header click and filters by name', async ($, on) => {
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/bin/ls') {
+      return { value: ran('docs/\nbig.zip\nsmall.txt\nmid.pdf\n') }
+    }
+
+    if (e.argv[0] === '/usr/bin/stat') {
+      return { value: ran('9000\tbig.zip\n10\tsmall.txt\n500\tmid.pdf\n') }
+    }
+
+    return { value: ran('') }
+  })
+
+  const rows = async (ui: { find: (q: object) => Promise<unknown> }) => {
+    const order: string[] = []
+
+    for (const name of ['docs/', 'big.zip', 'mid.pdf', 'small.txt']) {
+      const key = name.endsWith('/') ? `dir:${name}` : `file:${name}`
+      if ((await ui.find({ key })) !== undefined) order.push(name)
+    }
+
+    return order
+  }
+
+  // Clear and closing the list each draw a new, empty filter field.
+  let fieldId = 0
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    await ui.press({ key: 'list' })
+
+    // Each surface starts where the last one left the order: reset it.
+    while ((await ui.find({ key: 'sort-name' }))?.props.label !== 'Name ▲') {
+      await ui.press({ key: 'sort-name' })
+    }
+
+    await ui.press({ key: 'sort-size' })
+    expect((await ui.find({ key: 'sort-size' }))?.props.label).toBe('Size ▲')
+    expect((await ui.find({ key: 'sort-name' }))?.props.label).toBe('Name')
+    await ui.press({ key: 'sort-size' })
+    expect((await ui.find({ key: 'sort-size' }))?.props.label).toBe('Size ▼')
+    await ui.press({ key: 'sort-name' })
+    expect((await ui.find({ key: 'sort-name' }))?.props.label).toBe('Name ▲')
+
+    await ui.input({ key: `filter-${fieldId}`, text: 'I', kind: 'change' })
+    expect(await rows(ui)).toEqual(['big.zip', 'mid.pdf'])
+    expect(await ui.find({ key: 'clear-filter' })).toBeDefined()
+
+    await ui.input({ key: `filter-${fieldId}`, text: 'nothing', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: 'No name contains "nothing".' })).toBeDefined()
+
+    await ui.press({ key: 'clear-filter' })
+    fieldId += 1
+    expect(await ui.find({ key: `filter-${fieldId}` })).toBeDefined()
+    expect(await rows(ui)).toEqual(['docs/', 'big.zip', 'mid.pdf', 'small.txt'])
+
+    // With the list closed the field stays; typing in it opens the list.
+    await ui.press({ key: 'list' })
+    fieldId += 1
+    expect(await ui.find({ key: 'sort-name' })).toBeUndefined()
+    await ui.input({ key: `filter-${fieldId}`, text: 'big', kind: 'change' })
+    expect(await rows(ui)).toEqual(['big.zip'])
+    expect((await ui.find({ key: 'list' }))?.props.label).toBe('🙈 Hide')
+
+    await ui.press({ key: 'list' })
+    fieldId += 1
+    await ui.unmount()
+  }
+})
+
+test('Latest download copies the newest item of ~/Downloads', async ($, on) => {
+  const copies: (readonly string[])[] = []
+  let newest = '/Users/me/Downloads/report.pdf\n'
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/bin/sh' && String(e.argv[2]).includes('Downloads')) {
+      return { value: { ...ran(newest), exitCode: newest === '' ? 2 : 0 } }
+    }
+
+    if (e.argv[0] === '/bin/sh' && e.argv[5] === 'check') {
+      return { value: ran('') }
+    }
+
+    if (e.argv[0] === '/bin/sh') {
+      copies.push(e.argv.slice(4))
+      return { value: ran('OK\t/Users/me/Downloads/report.pdf\treport.pdf\t\n') }
+    }
+
+    return { value: ran('') }
+  })
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  await ui.press({ key: 'latest-download' })
+  expect(copies).toEqual([['/proj', 'keep', '/Users/me/Downloads/report.pdf']])
+  expect(await ui.find({ type: 'Text', text: 'report.pdf' })).toBeDefined()
+
+  newest = ''
+  await ui.press({ key: 'latest-download' })
+  expect(copies.length).toBe(1)
+  await ui.unmount()
 })

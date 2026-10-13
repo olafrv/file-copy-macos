@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Olaf Reitmaier
 
+export type SortKey = 'name' | 'size'
+
 export type Pending = { sources: string[]; conflicts: string[] }
 
 export type CopyResult = {
@@ -31,6 +33,10 @@ declare module 'claude-code' {
       selected: string[]
       isConfirming: boolean
       page: number
+      filter: string
+      filterId: number
+      sortBy: SortKey
+      isSortDesc: boolean
       subdir: string
       isNamingFolder: boolean
       folderError: string | null

@@ -3,12 +3,12 @@
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
 ```
-📎 Source(s):  [Paste paths -> Enter]  📄 Files...  📂 Folder...
-🎯 Target:     ~/Projects/my-app/docs
-📋 Contents:   🙈 Hide files   ❇️ New folder...
+📎 Source(s):  [Paste paths -> Enter]  📄 Files...  📂 Folder...  ⬇️ Latest download
+🎯 Target:     ~/Projects/my-app/docs   ↗️ Open
+📋 Contents:   🙈 Hide   ❇️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
                ⤴️ my-app/
                ┌──────────────────────────────────────────────────────────┐
-               │    │ Name              │ Size    │ Actions              │
+               │    │ Name ▲            │ Size    │ Actions              │
                │────┼───────────────────┼─────────┼──────────────────────│
                │ ☐  │ 📁 2026/          │         │ ↗️ Open  📝 Rename   │
                │ ☐  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open  📝 Rename   │
@@ -66,6 +66,7 @@ claude plugin uninstall file-copy-macos
 
 - **Paste paths** into the field and press Enter. In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
 - **📄 Files...** and **📂 Folder...** open the macOS picker. You can select several items.
+- **⬇️ Latest download** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
 - Folders are copied with all their contents.
 
@@ -82,12 +83,14 @@ If a name already exists in the target, the mod asks first:
 
 ### Target and contents
 
-- **🎯 Target** is the project root at the start.
+- **🎯 Target** is the project root at the start. **↗️ Open** shows the target folder in Finder.
 - **📋 Contents** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - **❇️ New folder...** creates a folder in the target and opens it.
-- The list shows 5 items per page. Use **◀ Prev** and **Next ▶** to change the page. Ticked items stay ticked on other pages.
+- **Filter:** is always shown. It shows only items whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
+- Click **Name** or **Size** in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
+- The list shows 4 items per page. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
 - Each row has **↗️ Open** (default macOS app for a file, Finder for a folder) and **📝 Rename**.
 - Tick files or folders (☐) and use **❌ Delete selected** to move them to the Trash. A folder goes to the Trash with all its contents.
 

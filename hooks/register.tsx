@@ -4,8 +4,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { CopyResult, Pending } from '../types'
-import { baseName, humanSize, parsePaths, toFieldText } from './paths'
+import type { CopyResult, Pending, SortKey } from '../types'
+import { baseName, humanSize, parsePaths, toFieldText, viewEntries } from './paths'
 
 // The mod's version, read from its own plugin.json at session start.
 const version = atom({ plugin: 'file-copy-macos', key: 'version' } as const, null)
@@ -37,6 +37,12 @@ const selected = atom({ plugin: 'file-copy-macos', key: 'selected' } as const, [
 const isConfirming = atom({ plugin: 'file-copy-macos', key: 'isConfirming' } as const, false)
 // The page of the file list on show, 0 for the first.
 const page = atom({ plugin: 'file-copy-macos', key: 'page' } as const, 0)
+// The file list's filter text, and the field's id: a new id draws it empty.
+const filter = atom({ plugin: 'file-copy-macos', key: 'filter' } as const, '')
+const filterId = atom({ plugin: 'file-copy-macos', key: 'filterId' } as const, 0)
+// The file list's order: by name or size, ascending or descending.
+const sortBy = atom({ plugin: 'file-copy-macos', key: 'sortBy' } as const, 'name')
+const isSortDesc = atom({ plugin: 'file-copy-macos', key: 'isSortDesc' } as const, false)
 // The target folder, relative to the project root ('' is the root itself),
 // and the "New folder..." field: open or not, and what was wrong with a name.
 const subdir = atom({ plugin: 'file-copy-macos', key: 'subdir' } as const, '')
@@ -119,7 +125,7 @@ const pickScript = (kind: PickKind): string[] => [
 const REPO_URL = 'https://github.com/olafrv/file-copy-macos'
 
 // Entries per page of the file list.
-const PAGE_SIZE = 5
+const PAGE_SIZE = 4
 
 // The file list's columns, in terminal cells: the tick box, the size
 // ("999 KB"), the actions ("↗️ Open  📝 Rename") and the least the name gets.
@@ -135,6 +141,20 @@ const fitName = (label: string, width: number): string => {
   const chars = [...label]
 
   return chars.length + 1 <= width ? label : `${chars.slice(0, width - 2).join('')}…`
+}
+
+// A header button sorts by its column; again, the other way round.
+const sortOn = async ($: EngineInterface, by: SortKey) => {
+  const isSame = (await read($, sortBy)) === by
+
+  await update($, isSortDesc, desc => (isSame ? !desc : false))
+  await update($, sortBy, () => by)
+  await update($, page, () => 0)
+}
+
+const clearFilter = async ($: EngineInterface) => {
+  await update($, filter, () => '')
+  await update($, filterId, id => id + 1)
 }
 
 // Wide enough for "⌨ Shortcuts:" (an icon is 2 columns), so the rows line up.
@@ -330,6 +350,7 @@ const trashLastCopy = async ($: EngineInterface, result: CopyResult) => {
 const openFolder = async ($: EngineInterface, dir: string) => {
   await update($, subdir, () => dir)
   await update($, page, () => 0)
+  await clearFilter($)
   await update($, selected, () => [])
   await update($, isConfirming, () => false)
   await update($, isNamingFolder, () => false)
@@ -357,12 +378,15 @@ const folderNameError = (name: string): string | null => {
 
 // Opens a file or folder of the target as a double-click in Finder would:
 // macOS `open` picks the default app for a file and shows a folder in Finder.
+// An empty name opens the target folder itself.
 const openWithDefaultApp = async ($: EngineInterface, name: string) => {
-  const path = `${await targetDir($)}/${name.replace(/\/$/, '')}`
+  const dir = await targetDir($)
+  const path = name === '' ? dir : `${dir}/${name.replace(/\/$/, '')}`
   const { exitCode, stderr } = await $.process.run(['/usr/bin/open', path])
 
   if (exitCode !== 0) {
-    $.ui.toast(`Could not open ${name}: ${stderr.trim() || 'no app for this file type'}`)
+    const what = name === '' ? shortPath(dir) : name
+    $.ui.toast(`Could not open ${what}: ${stderr.trim() || 'no app for this file type'}`)
   }
 }
 
@@ -473,6 +497,17 @@ const toggleList = async ($: EngineInterface) => {
     await loadEntries($)
   } else {
     await update($, selected, () => [])
+    await clearFilter($)
+  }
+}
+
+// The filter field is always drawn: typing in it shows the list.
+const filterBy = async ($: EngineInterface, value: string) => {
+  await update($, filter, () => value)
+  await update($, page, () => 0)
+
+  if (value.trim() !== '' && !(await read($, isListOpen))) {
+    await toggleList($)
   }
 }
 
@@ -637,6 +672,37 @@ const pickAndCopy = async ($: EngineInterface, kind: PickKind) => {
   }
 }
 
+// Prints the newest item in ~/Downloads, file or folder, skipping Finder's
+// own files and downloads still in progress; exit 2 when there is none.
+const LATEST_DOWNLOAD_SCRIPT = `
+cd "$HOME/Downloads" 2>/dev/null || exit 2
+/bin/ls -1tA | while IFS= read -r name; do
+  case "$name" in
+    .DS_Store|.localized|*.crdownload|*.download|*.part|*.partial) continue ;;
+  esac
+  printf '%s/%s\\n' "$PWD" "$name"
+  exit 0
+done | /usr/bin/grep . || exit 2
+`
+
+const copyLatestDownload = async ($: EngineInterface) => {
+  const { stdout, exitCode } = await $.process.run([
+    '/bin/sh',
+    '-c',
+    LATEST_DOWNLOAD_SCRIPT,
+    'file-copy-macos',
+  ])
+  const path = stdout.split('\n')[0] ?? ''
+
+  if (exitCode !== 0 || path === '') {
+    $.ui.toast('No download found in ~/Downloads')
+    return
+  }
+
+  await update($, hint, () => null)
+  await copyIntoProject($, [path])
+}
+
 const loadVersion = async ($: EngineInterface) => {
   try {
     const manifest = JSON.parse(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`))
@@ -689,10 +755,15 @@ export const register: Register = on => {
     const ticked = listOpen ? await read($, selected) : []
     const sizeOf = listOpen ? await read($, sizes) : {}
     const confirming = listOpen && ticked.length > 0 && (await read($, isConfirming))
+    const filterText = await read($, filter)
+    const by = await read($, sortBy)
+    const desc = await read($, isSortDesc)
+    const view = viewEntries(names, sizeOf, filterText, by, desc)
+    const arrow = (key: SortKey) => (by === key ? (desc ? ' ▼' : ' ▲') : '')
     // A page past the end (after a delete) shows the last page.
-    const pageCount = Math.max(1, Math.ceil(names.length / PAGE_SIZE))
+    const pageCount = Math.max(1, Math.ceil(view.length / PAGE_SIZE))
     const shownPage = Math.min(listOpen ? await read($, page) : 0, pageCount - 1)
-    const pageNames = names.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE)
+    const pageNames = view.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE)
     // The "│" and "─┼─" lines only meet the columns in the terminal's monospace
     // font; the desktop draws text in another font, so it gets the frame alone.
     const lines = e.surface === 'terminal'
@@ -782,6 +853,11 @@ export const register: Register = on => {
             label="📂 Folder..."
             onPress={() => pickAndCopy($, 'folders')}
           />
+          <Button
+            key="latest-download"
+            label="⬇️ Latest download"
+            onPress={() => copyLatestDownload($)}
+          />
         </Box>
         {message !== null && (
           <Box flexDirection="row" gap={1}>
@@ -809,6 +885,13 @@ export const register: Register = on => {
             <Text>🎯 Target:</Text>
           </Box>
           <Text dimColor>{shortPath(target)}</Text>
+          <Button
+            key="open-target"
+            label="↗️ Open"
+            plain
+            dimColor
+            onPress={() => openWithDefaultApp($, '')}
+          />
         </Box>
         <Box flexDirection="row" gap={1}>
           <Box width={LABEL_WIDTH}>
@@ -816,7 +899,7 @@ export const register: Register = on => {
           </Box>
           <Button
             key="list"
-            label={listOpen ? '🙈 Hide files' : '👀 Show files'}
+            label={listOpen ? '🙈 Hide' : '👀 Show'}
             plain
             onPress={() => toggleList($)}
           />
@@ -828,6 +911,42 @@ export const register: Register = on => {
               onPress={() => update($, isNamingFolder, () => true)}
             />
           )}
+          {/* The terminal draws the field as wide as its box; the desktop at its
+              own width, so a fixed box there would push Clear away. */}
+          <Box width={lines ? 38 : undefined}>
+            <Input
+              key={`filter-${await read($, filterId)}`}
+              label="Filter"
+              placeholder="Name"
+              submitLabel="🔍 Find"
+              onInput={(value: string) => filterBy($, value)}
+              onSubmit={(value: string) => filterBy($, value)}
+            />
+          </Box>
+          {filterText !== '' && (
+            <Button key="clear-filter" label="🧹 Clear" plain dimColor onPress={() => clearFilter($)} />
+          )}
+          {listOpen && pageCount > 1 && (
+            <Box flexDirection="row" gap={1}>
+              {shownPage > 0 && (
+                <Button
+                  key="page-prev"
+                  label="◀"
+                  plain
+                  onPress={() => update($, page, () => shownPage - 1)}
+                />
+              )}
+              <Text dimColor>{`${shownPage + 1}/${pageCount} (#${view.length})`}</Text>
+              {shownPage < pageCount - 1 && (
+                <Button
+                  key="page-next"
+                  label="▶"
+                  plain
+                  onPress={() => update($, page, () => shownPage + 1)}
+                />
+              )}
+            </Box>
+          )}
         </Box>
         {naming && (
           <Box flexDirection="row" gap={1}>
@@ -837,7 +956,7 @@ export const register: Register = on => {
                 <Box flexGrow={1}>
                   <Input
                     key="folder-name"
-                    label="❇️ New folder:"
+                    label="❇️ New folder"
                     placeholder="Name, then Enter"
                     submitLabel="❇️ Create"
                     autoFocus
@@ -872,7 +991,10 @@ export const register: Register = on => {
                 />
               )}
               {names.length === 0 && <Text dimColor>The folder is empty.</Text>}
-              {names.length > 0 && (
+              {names.length > 0 && view.length === 0 && (
+                <Text dimColor>{`No name contains "${filterText.trim()}".`}</Text>
+              )}
+              {view.length > 0 && (
                 <Box
                   key="table"
                   flexDirection="column"
@@ -884,11 +1006,23 @@ export const register: Register = on => {
                     <Box width={lines ? tickWidth + 2 : tickWidth} />
                     {lines && <Text dimColor>│</Text>}
                     <Box width={nameWidth + 2} paddingX={1}>
-                      <Text dimColor>Name</Text>
+                      <Button
+                        key="sort-name"
+                        label={`Name${arrow('name')}`}
+                        plain
+                        dimColor
+                        onPress={() => sortOn($, 'name')}
+                      />
                     </Box>
                     {lines && <Text dimColor>│</Text>}
                     <Box width={SIZE_WIDTH + 2} paddingX={1}>
-                      <Text dimColor>Size</Text>
+                      <Button
+                        key="sort-size"
+                        label={`Size${arrow('size')}`}
+                        plain
+                        dimColor
+                        onPress={() => sortOn($, 'size')}
+                      />
                     </Box>
                     {lines && <Text dimColor>│</Text>}
                     <Box width={ACTIONS_WIDTH + 2} paddingX={1}>
@@ -909,7 +1043,7 @@ export const register: Register = on => {
                           <Box flexGrow={1}>
                             <Input
                               key={`rename-field:${name}`}
-                              label="📝 Rename to:"
+                              label="📝 Rename to"
                               value={name.replace(/\/$/, '')}
                               submitLabel="📝 Rename"
                               autoFocus
@@ -983,29 +1117,6 @@ export const register: Register = on => {
                         </Box>
                       </Box>
                     ),
-                  )}
-                </Box>
-              )}
-              {pageCount > 1 && (
-                <Box flexDirection="row" gap={2}>
-                  {shownPage > 0 && (
-                    <Button
-                      key="page-prev"
-                      label="◀ Prev"
-                      plain
-                      onPress={() => update($, page, () => shownPage - 1)}
-                    />
-                  )}
-                  <Text dimColor>
-                    {`Page ${shownPage + 1} of ${pageCount} (${names.length} items)`}
-                  </Text>
-                  {shownPage < pageCount - 1 && (
-                    <Button
-                      key="page-next"
-                      label="Next ▶"
-                      plain
-                      onPress={() => update($, page, () => shownPage + 1)}
-                    />
                   )}
                 </Box>
               )}

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Olaf Reitmaier
 
+import type { SortKey } from '../types'
+
 // Turns what a drag, a paste or a typed line put in the field into paths.
 // Terminals insert dragged files as `/a/My\ File.pdf /b/x.png` or quoted;
 // Finder's "Copy as Pathname" gives one path per line; browsers give file:// URLs.
@@ -127,4 +129,37 @@ export const humanSize = (bytes: number): string => {
   }
 
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`
+}
+
+// Names as Finder sorts them: "f2" before "f10", case ignored.
+const byName = (a: string, b: string): number =>
+  a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+
+/**
+ * The entries to show: those whose name holds the filter text (case
+ * ignored), folders first, each group in the chosen order. Folders have no
+ * size, so by size they keep the name order.
+ */
+export const viewEntries = (
+  names: readonly string[],
+  sizeOf: { readonly [name: string]: number },
+  text: string,
+  by: SortKey,
+  isDesc: boolean,
+): string[] => {
+  const query = text.trim().toLowerCase()
+  const shown = names.filter(n => n.replace(/\/$/, '').toLowerCase().includes(query))
+  const sign = isDesc ? -1 : 1
+  const folders = shown
+    .filter(n => n.endsWith('/'))
+    .sort((a, b) => (by === 'name' ? sign : 1) * byName(a, b))
+  const files = shown
+    .filter(n => !n.endsWith('/'))
+    .sort((a, b) =>
+      by === 'size'
+        ? sign * ((sizeOf[a] ?? 0) - (sizeOf[b] ?? 0)) || byName(a, b)
+        : sign * byName(a, b),
+    )
+
+  return [...folders, ...files]
 }
