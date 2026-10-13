@@ -3,7 +3,7 @@
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
 ```
-📎 Source(s):  [Paste paths -> Enter] 📥 Add   📄 Files...  📂 Folder...  📥 Paste  ⬇️ Latest download
+📎 Src:        [Paste paths -> Enter] 📥 Add   📄 Files...  📂 Folder...  📥 Paste  ⬇️ Latest download
 🎯 Target:     ~/Projects/my-app/docs   ↗️ Open  📌 Finder
 📚 Contents:   🙈 Hide   🗂️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
                ⤴️ my-app/
@@ -14,7 +14,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
                │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
                └────────────────────────────────────────────────────────────────────────────┘
                1 selected:  ❌ Delete  💬 Ask  📋 Copy
-⚡ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32:15 CEST · v1.10.0
+⚡ In Finder:  Cmd+C → 📥 Paste, Opt+Cmd+C → Cmd+V in Src field   Tue 13.10.2026 14:32:15 CEST · v1.10.0
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -108,7 +108,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Clock
 
-The Shortcuts row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32:15 CEST`. It changes every second. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
+The In Finder row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32:15 CEST`. It changes every second. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
 
 ### What Claude is told
 

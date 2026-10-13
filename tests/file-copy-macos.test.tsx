@@ -1031,7 +1031,7 @@ test('the clock reads the zone from macOS and shows date, time and zone', async 
   expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('Wed 31.12.2025 21:00:00 EST')
 })
 
-test('the Shortcuts row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
+test('the In Finder row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('clock.now', () => ({ value: Date.UTC(2026, 9, 13, 12, 32, 15) }))
   on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/date' ? '+0200 CEST\n' : '') }))
@@ -1206,4 +1206,19 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
     expect(copies.length).toBe(1)
     await ui.unmount()
   }
+})
+
+test('the In Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', () => ({ value: ran('') }))
+  const tip = 'Cmd+C → 📥 Paste, Opt+Cmd+C → Cmd+V in Src field'
+
+  const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  expect(await desktop.find({ type: 'Text', text: '⚡ In Finder:' })).toBeDefined()
+  expect(await desktop.find({ type: 'Text', text: tip })).toBeDefined()
+  await desktop.unmount()
+
+  const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
+  expect(await terminal.find({ type: 'Text', text: `Drag into Src field, ${tip}` })).toBeDefined()
+  await terminal.unmount()
 })
