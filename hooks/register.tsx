@@ -35,6 +35,8 @@ const entries = atom({ plugin: 'file-copy-macos', key: 'entries' } as const, [])
 const sizes = atom({ plugin: 'file-copy-macos', key: 'sizes' } as const, {})
 const selected = atom({ plugin: 'file-copy-macos', key: 'selected' } as const, [])
 const isConfirming = atom({ plugin: 'file-copy-macos', key: 'isConfirming' } as const, false)
+// The page of the file list on show, 0 for the first.
+const page = atom({ plugin: 'file-copy-macos', key: 'page' } as const, 0)
 // The target folder, relative to the project root ('' is the root itself),
 // and the "New folder..." field: open or not, and what was wrong with a name.
 const subdir = atom({ plugin: 'file-copy-macos', key: 'subdir' } as const, '')
@@ -112,6 +114,9 @@ const pickScript = (kind: PickKind): string[] => [
   'end repeat',
   'return out',
 ]
+
+// Entries per page of the file list.
+const PAGE_SIZE = 5
 
 // Wide enough for "⌨ Shortcuts:" (an icon is 2 columns), so the rows line up.
 const LABEL_WIDTH = 13
@@ -305,6 +310,7 @@ const trashLastCopy = async ($: EngineInterface, result: CopyResult) => {
 
 const openFolder = async ($: EngineInterface, dir: string) => {
   await update($, subdir, () => dir)
+  await update($, page, () => 0)
   await update($, selected, () => [])
   await update($, isConfirming, () => false)
   await update($, isNamingFolder, () => false)
@@ -444,6 +450,7 @@ const toggleList = async ($: EngineInterface) => {
   await update($, isConfirming, () => false)
 
   if (isOpen) {
+    await update($, page, () => 0)
     await loadEntries($)
   } else {
     await update($, selected, () => [])
@@ -663,6 +670,10 @@ export const register: Register = on => {
     const ticked = listOpen ? await read($, selected) : []
     const sizeOf = listOpen ? await read($, sizes) : {}
     const confirming = listOpen && ticked.length > 0 && (await read($, isConfirming))
+    // A page past the end (after a delete) shows the last page.
+    const pageCount = Math.max(1, Math.ceil(names.length / PAGE_SIZE))
+    const shownPage = Math.min(listOpen ? await read($, page) : 0, pageCount - 1)
+    const pageNames = names.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE)
     const showResult = result !== null && !hidden && !isBusy && ask === null
     // The Hide button sits on the last result line drawn.
     const hideOn =
@@ -832,7 +843,7 @@ export const register: Register = on => {
                 />
               )}
               {names.length === 0 && <Text dimColor>The folder is empty.</Text>}
-              {names.map(name =>
+              {pageNames.map(name =>
                 editing === name ? (
                   <Box key={`edit:${name}`} flexDirection="column">
                     <Box flexDirection="row" gap={1}>
@@ -916,6 +927,29 @@ export const register: Register = on => {
                     />
                   </Box>
                 ),
+              )}
+              {pageCount > 1 && (
+                <Box flexDirection="row" gap={2}>
+                  {shownPage > 0 && (
+                    <Button
+                      key="page-prev"
+                      label="◀ Prev"
+                      plain
+                      onPress={() => update($, page, () => shownPage - 1)}
+                    />
+                  )}
+                  <Text dimColor>
+                    {`Page ${shownPage + 1} of ${pageCount} (${names.length} items)`}
+                  </Text>
+                  {shownPage < pageCount - 1 && (
+                    <Button
+                      key="page-next"
+                      label="Next ▶"
+                      plain
+                      onPress={() => update($, page, () => shownPage + 1)}
+                    />
+                  )}
+                </Box>
               )}
               {ticked.length > 0 && !confirming && (
                 <Box flexDirection="row">

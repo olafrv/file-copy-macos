@@ -30,6 +30,7 @@ declare module 'claude-code' {
       sizes: { [name: string]: number }
       selected: string[]
       isConfirming: boolean
+      page: number
       subdir: string
       isNamingFolder: boolean
       folderError: string | null

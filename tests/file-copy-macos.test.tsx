@@ -742,3 +742,81 @@ test('Contents renames a folder, never over another one', async ($, on) => {
   const fyi = session.appended().filter(r => r.message.type === 'user')
   expect(JSON.stringify(fyi[0])).toContain('renamed the folder docs to Docs 2026')
 })
+
+test('Contents shows 5 entries per page and keeps ticks across pages', async ($, on) => {
+  const start = ['d1/', 'd2/', ...Array.from({ length: 9 }, (_, i) => `f${i + 1}.txt`)]
+  const trashed: string[] = []
+  let folder = [...start]
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    const [cmd] = e.argv
+
+    if (cmd === '/bin/ls') {
+      const dir = e.argv[e.argv.length - 1] ?? ''
+      return { value: ran(dir === '/proj' ? folder.join('\n') + '\n' : '') }
+    }
+
+    if (cmd === '/usr/bin/trash') {
+      const path = e.argv[1] ?? ''
+      trashed.push(path)
+      folder = folder.filter(name => `/proj/${name.replace(/\/$/, '')}` !== path)
+    }
+
+    return { value: ran('') }
+  })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    folder = [...start]
+    trashed.length = 0
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    await ui.press({ key: 'list' })
+
+    // Page 1: the 2 folders and f1 to f3; no Prev.
+    expect(await ui.find({ type: 'Text', text: 'Page 1 of 3 (11 items)' })).toBeDefined()
+    expect(await ui.find({ key: 'dir:d1/' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f3.txt' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f4.txt' })).toBeUndefined()
+    expect(await ui.find({ key: 'page-prev' })).toBeUndefined()
+
+    await ui.press({ key: 'file:f1.txt' })
+    await ui.press({ key: 'page-next' })
+    expect(await ui.find({ type: 'Text', text: 'Page 2 of 3 (11 items)' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f4.txt' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f1.txt' })).toBeUndefined()
+
+    await ui.press({ key: 'page-next' })
+    expect(await ui.find({ key: 'file:f9.txt' })).toBeDefined()
+    expect(await ui.find({ key: 'page-next' })).toBeUndefined()
+
+    // A tick from page 1 and one from page 3 are deleted together.
+    await ui.press({ key: 'file:f9.txt' })
+    expect(await ui.find({ key: 'delete-selected' })).toBeDefined()
+    await ui.press({ key: 'delete-selected' })
+    await ui.press({ key: 'confirm-delete' })
+    expect([...trashed].sort()).toEqual(['/proj/f1.txt', '/proj/f9.txt'])
+
+    // 9 entries left: page 3 is gone, the last page shows.
+    expect(await ui.find({ type: 'Text', text: 'Page 2 of 2 (9 items)' })).toBeDefined()
+    expect(await ui.find({ key: 'file:f8.txt' })).toBeDefined()
+
+    await ui.press({ key: 'page-prev' })
+    expect(await ui.find({ type: 'Text', text: 'Page 1 of 2 (9 items)' })).toBeDefined()
+
+    // An empty folder has no page row; going up starts on page 1.
+    await ui.press({ key: 'dir:d1/' })
+    expect(await ui.find({ type: 'Text', text: 'The folder is empty.' })).toBeDefined()
+    expect(await ui.find({ key: 'page-next' })).toBeUndefined()
+    await ui.press({ key: 'up' })
+    expect(await ui.find({ type: 'Text', text: 'Page 1 of 2 (9 items)' })).toBeDefined()
+
+    // Closing and opening the list starts on page 1 again.
+    await ui.press({ key: 'page-next' })
+    await ui.press({ key: 'list' })
+    await ui.press({ key: 'list' })
+    expect(await ui.find({ type: 'Text', text: 'Page 1 of 2 (9 items)' })).toBeDefined()
+
+    await ui.press({ key: 'list' })
+    await ui.unmount()
+  }
+})
