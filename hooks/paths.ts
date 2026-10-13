@@ -229,3 +229,21 @@ export const formatClock = (ms: number, offset: number, zone: string): string =>
     `${d.getUTCFullYear()} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} ${zone}`
   )
 }
+
+/**
+ * Whether an entry from `ls`, `find` or `git` is a plain name or path below
+ * the target: no ".", "..", empty or absolute parts, no control characters.
+ * A name with a line break could otherwise split into a fake ".." entry.
+ */
+export const isSafeEntry = (entry: string): boolean => {
+  const bare = entry.replace(/\/$/, '')
+  // eslint-disable-next-line no-control-regex
+  const hasControl = /[\u0000-\u001f\u007f]/.test(entry)
+
+  return (
+    bare !== '' &&
+    !hasControl &&
+    !bare.startsWith('/') &&
+    bare.split('/').every(part => part !== '' && part !== '.' && part !== '..')
+  )
+}

@@ -3,7 +3,15 @@
 
 import { expect, mock, test } from 'claude-code/testing'
 
-import { formatClock, humanSize, parsePaths, parseZone, toFieldText, viewEntries } from '../hooks/paths'
+import {
+  formatClock,
+  humanSize,
+  isSafeEntry,
+  parsePaths,
+  parseZone,
+  toFieldText,
+  viewEntries,
+} from '../hooks/paths'
 
 const BAND = {
   component: 'AbovePrompt',
@@ -180,6 +188,9 @@ test('the file list deletes ticked files only after a confirmation', async ($, o
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', ($, e) => {
     if (e.argv[0] === '/bin/ls') {
+      // -q and UTF-8: a line break in a name cannot split it; umlauts stay.
+      expect(e.argv.slice(0, 2)).toEqual(['/bin/ls', '-1Apq'])
+      expect(e.init?.env?.LC_ALL).toBe('en_US.UTF-8')
       return { value: ran(folder.join('\n') + '\n') }
     }
 
@@ -589,7 +600,7 @@ test('Contents shows each file size and none for folders', async ($, on) => {
     }
 
     if (e.argv[0] === '/usr/bin/stat') {
-      expect(e.argv.slice(3)).toEqual(['a.pdf', 'My File.txt'])
+      expect(e.argv.slice(3)).toEqual(['--', 'a.pdf', 'My File.txt'])
       expect(e.init?.cwd).toBe('/proj')
 
       return { value: ran('13422\ta.pdf\n512\tMy File.txt\n') }
@@ -1233,7 +1244,7 @@ test('Find searches subfolders: Folder column, warnings, rename in place', { opt
   on('process.run', ($, e) => {
     const [cmd] = e.argv
 
-    if (cmd === '/bin/sh' && String(e.argv[2]).includes('git ls-files')) {
+    if (cmd === '/bin/sh' && String(e.argv[2]).includes('ls-files -co')) {
       searches.push(e.argv.slice(4))
       return { value: ran(found) }
     }
@@ -1326,5 +1337,32 @@ test('Find searches subfolders: Folder column, warnings, rename in place', { opt
   expect(await ui.find({ key: 'sort-folder' })).toBeUndefined()
   expect(await ui.find({ key: 'up' })).toBeDefined()
 
+  await ui.unmount()
+})
+
+test('only plain names and paths below the target are listed', async () => {
+  for (const ok of ['a.pdf', 'docs/', 'docs/2026/a.pdf', '.env', 'ä ö.txt', '..hidden']) {
+    expect(isSafeEntry(ok)).toBe(true)
+  }
+
+  // A name with a line break would split into a fake ".." line: never listed.
+  for (const bad of ['', '.', '..', '../', 'a/../b', '/etc/passwd', 'a//b', './a', 'a\nb', 'a\tb']) {
+    expect(isSafeEntry(bad)).toBe(false)
+  }
+})
+
+test('Clear goes back to page 1', async ($, on) => {
+  const names = ['d1/', ...Array.from({ length: 9 }, (_, i) => `f${i + 1}.txt`)]
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/ls' ? names.join('\n') + '\n' : '') }))
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
+  await ui.input({ key: 'filter-0', text: 'f', kind: 'change' })
+  await ui.press({ key: 'page-next' })
+  expect(await ui.find({ type: 'Text', text: '2/3 (#9)' })).toBeDefined()
+
+  await ui.press({ key: 'clear-filter' })
+  expect(await ui.find({ type: 'Text', text: '1/3 (#10)' })).toBeDefined()
   await ui.unmount()
 })

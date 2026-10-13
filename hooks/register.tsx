@@ -13,6 +13,7 @@ import {
   formatClock,
   humanSize,
   parsePaths,
+  isSafeEntry,
   parseSkipList,
   parseZone,
   toFieldText,
@@ -185,6 +186,7 @@ const endSearch = async ($: EngineInterface) => {
 
 const clearFilter = async ($: EngineInterface) => {
   await update($, filter, () => '')
+  await update($, page, () => 0)
   await update($, filterId, id => id + 1)
   await endSearch($)
 }
@@ -300,7 +302,11 @@ const tellClaudeFolder = async ($: EngineInterface, path: string) => {
 // The project folder's top-level entries, folders with a trailing "/".
 const loadEntries = async ($: EngineInterface) => {
   const dir = await targetDir($)
-  const { stdout, exitCode } = await $.process.run(['/bin/ls', '-1Ap', dir])
+  // -q prints control characters as "?": a line break cannot split a name.
+  // The UTF-8 setting keeps umlauts and other letters as they are.
+  const { stdout, exitCode } = await $.process.run(['/bin/ls', '-1Apq', dir], {
+    env: { LC_ALL: 'en_US.UTF-8' },
+  })
 
   // The folder is gone (deleted or renamed outside): back to the project root.
   if (exitCode !== 0 && (await read($, subdir)) !== '') {
@@ -309,7 +315,9 @@ const loadEntries = async ($: EngineInterface) => {
     return
   }
 
-  const all = stdout.split('\n').filter(name => name !== '' && name !== '.DS_Store')
+  const all = stdout
+    .split('\n')
+    .filter(name => name !== '.DS_Store' && isSafeEntry(name) && !name.slice(0, -1).includes('/'))
   // Folders first, then files; each group keeps the order ls gave.
   const names = [...all.filter(n => n.endsWith('/')), ...all.filter(n => !n.endsWith('/'))]
 
@@ -331,7 +339,8 @@ const sizesOf = async ($: EngineInterface, dir: string, names: readonly string[]
 
   if (files.length > 0) {
     // One line per file: size, a tab, the name as given (run inside the folder).
-    const stat = await $.process.run(['/usr/bin/stat', '-f', '%z%t%N', ...files], { cwd: dir })
+    // "--": a name such as "-L" is a name, not an option.
+    const stat = await $.process.run(['/usr/bin/stat', '-f', '%z%t%N', '--', ...files], { cwd: dir })
 
     for (const line of stat.stdout.split('\n')) {
       const tab = line.indexOf('\t')
@@ -706,13 +715,21 @@ SKIP=$(printf '%s\\n' "$@"); export Q SKIP
 out=$(/usr/bin/mktemp -t file-copy-search) || exit 2
 n0=$#
 for name in "$@"; do set -- "$@" -o -name "$name"; done
+# Names with a line break are skipped: they would split into two lines.
+NL='
+'
+set -- "$@" -o -name "*$NL*"
 shift "$n0"
-if [ $# -gt 0 ]; then shift; else set -- -false; fi
+shift
 # Its own process group, so the time limit stops every process of the search.
 set -m
 (
-  if /usr/bin/git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    /usr/bin/git ls-files -co --exclude-standard 2>/dev/null |
+  # fsmonitor off: a repository's config must not start a program.
+  # quotePath off: names with umlauts stay as they are; git still quotes
+  # names with control characters, and those lines are dropped.
+  if /usr/bin/git -c core.fsmonitor=false rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    /usr/bin/git -c core.fsmonitor=false -c core.quotePath=false ls-files -co --exclude-standard 2>/dev/null |
+      /usr/bin/grep -v '^"' |
       /usr/bin/awk '{ print; p = $0
         while (match(p, /\\/[^\\/]*$/) > 0) { p = substr(p, 1, RSTART - 1)
           if (!(p in seen)) { seen[p] = 1; print p "/" } } }'
@@ -774,11 +791,11 @@ const runSearch = async ($: EngineInterface, text: string) => {
         String(SEARCH_SECONDS),
         ...skipFolders,
       ],
-      { cwd: dir, timeoutMs: (SEARCH_SECONDS + 10) * 1000 },
+      { cwd: dir, env: { LC_ALL: 'en_US.UTF-8' }, timeoutMs: (SEARCH_SECONDS + 10) * 1000 },
     )
     const lines = stdout.split('\n').filter(line => line !== '')
     const isTimedOut = lines.includes('#TIMEOUT')
-    const found = lines.filter(line => line !== '#TIMEOUT')
+    const found = lines.filter(line => line !== '#TIMEOUT' && isSafeEntry(line))
     const hits = found.slice(0, SEARCH_LIMIT)
     const note =
       found.length > SEARCH_LIMIT
