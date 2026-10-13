@@ -599,7 +599,7 @@ test('Contents shows each file size and none for folders', async ($, on) => {
   await ui.unmount()
 })
 
-test('the band shows the version from plugin.json in the Shortcuts row', async ($, on) => {
+test('the desktop band links the version to the repository, the terminal band hides it', async ($, on) => {
   const reads: string[] = []
 
   on('session.root', () => ({ value: '/proj' }))
@@ -614,11 +614,17 @@ test('the band shows the version from plugin.json in the Shortcuts row', async (
   await $.session.start({ cwd: '/proj', surface: 'terminal', isInteractive: true })
   expect(reads[0]).toMatch(/\/\.claude-plugin\/plugin\.json$/)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: 'file-copy-macos v9.8.7' })).toBeDefined()
-    await ui.unmount()
-  }
+  // The desktop shows it as a link to the repository; the terminal not at all.
+  const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  const link = await desktop.find({ type: 'Link' })
+  expect(link?.props.href).toBe('https://github.com/olafrv/file-copy-macos')
+  expect(link?.children).toEqual(['file-copy-macos v9.8.7'])
+  await desktop.unmount()
+
+  const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
+  expect(await terminal.find({ type: 'Link' })).toBeUndefined()
+  expect(await terminal.find({ type: 'Text', text: 'file-copy-macos v9.8.7' })).toBeUndefined()
+  await terminal.unmount()
 })
 
 test('the file list deletes ticked folders with their contents after a confirmation', async ($, on) => {

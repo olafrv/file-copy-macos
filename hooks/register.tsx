@@ -115,6 +115,9 @@ const pickScript = (kind: PickKind): string[] => [
   'return out',
 ]
 
+// Where the version links to; it shows on the desktop only.
+const REPO_URL = 'https://github.com/olafrv/file-copy-macos'
+
 // Entries per page of the file list.
 const PAGE_SIZE = 5
 
@@ -667,7 +670,7 @@ export const register: Register = on => {
       return next(e)
     }
 
-    const { Box, Button, Input, Text } = $.ui.resolve(e)
+    const { Box, Button, Input, Link, Text } = $.ui.resolve(e)
 
     const root = await $.session.root()
     const dir = await read($, subdir)
@@ -1049,7 +1052,11 @@ export const register: Register = on => {
                 : 'Option+Cmd+C in Finder copies paths'}
             </Text>
           </Box>
-          {modVersion !== null && <Text dimColor>{`file-copy-macos v${modVersion}`}</Text>}
+          {modVersion !== null && e.surface === 'desktop' && (
+            <Text dimColor>
+              <Link href={REPO_URL}>{`file-copy-macos v${modVersion}`}</Link>
+            </Text>
+          )}
         </Box>
         {ask !== null && (
           <Box flexDirection="row" gap={1}>
