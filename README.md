@@ -181,9 +181,19 @@ claude plugin test .
 
 ### Release a new version
 
-1. Raise `"version"` in `.claude-plugin/plugin.json`, for example `0.1.0` to `0.2.0`.
-2. Run the check and the tests.
-3. Commit and push.
+1. Raise `"version"` in `.claude-plugin/plugin.json` and in the bar sketch at the top of this README, for example `1.11.0` to `1.12.0`.
+2. Add a section for the new version at the top of [CHANGELOG.md](CHANGELOG.md).
+3. Run the check and the tests.
+4. Commit and push.
+5. Tag the release with its changelog section as the message, and push the tag:
+
+   ```bash
+   git tag -a v1.12.0 -m "Release 1.12.0" -m "<the changelog section>"
+   ```
+
+   ```bash
+   git push origin v1.12.0
+   ```
 
 Users then get the new version with `claude plugin update file-copy-macos` (see [Update](#update)).
 
@@ -192,6 +202,7 @@ Users then get the new version with `claude plugin update file-copy-macos` (see 
 | Path | Content |
 | --- | --- |
 | `.claude-plugin/plugin.json` | The mod's manifest |
+| `CHANGELOG.md` | What changed in each version |
 | `.claude-plugin/marketplace.json` | Makes this repository a marketplace |
 | `hooks/register.tsx` | The bar and all actions |
 | `hooks/paths.ts` | Path parsing and size formatting |
