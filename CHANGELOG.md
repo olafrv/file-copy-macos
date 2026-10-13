@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.0
+
+- 🔍 Find (or Enter) now searches the target folder and all folders below it. Typing still filters the current folder only.
+  - In a git project, the search follows `.gitignore`. Elsewhere, it skips the folders of the new setting **Search: skip folders** (default: `.git, .svn, .hg, node_modules, bower_components`).
+  - At most 500 results and 5 seconds. A yellow warning says when a limit was hit.
+- During a search, the table has a **Folder** column: sortable, a click opens the folder, and pointing at it shows the full path.
+- 📝 Ren keeps a found item in its own folder, and 💬 Ask writes its full path.
+- The table uses the whole width of the bar.
+- New placeholders: "Paste paths (↵ add)" and "Name (↵ recursive)".
+- The clock shows minutes again, so the bar redraws only once per minute.
+
 ## 1.11.1
 
 - The In Finder tip uses "->" instead of "then": "Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field".
