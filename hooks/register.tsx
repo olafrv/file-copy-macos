@@ -302,54 +302,54 @@ const tellClaudeFolder = async ($: EngineInterface, path: string) => {
 // The project folder's top-level entries, folders with a trailing "/".
 const loadEntries = async ($: EngineInterface) => {
   const dir = await targetDir($)
-  // -q prints control characters as "?": a line break cannot split a name.
-  // The UTF-8 setting keeps umlauts and other letters as they are.
-  const { stdout, exitCode } = await $.process.run(['/bin/ls', '-1Apq', dir], {
-    env: { LC_ALL: 'en_US.UTF-8' },
-  })
+  // $.fs.list gives each real name with its kind and size: nothing to parse,
+  // so no name can split into a fake entry.
+  const listing = await $.fs.list(dir).catch(() => null)
 
   // The folder is gone (deleted or renamed outside): back to the project root.
-  if (exitCode !== 0 && (await read($, subdir)) !== '') {
-    await update($, subdir, () => '')
-    await loadEntries($)
+  if (listing === null) {
+    if ((await read($, subdir)) !== '') {
+      await update($, subdir, () => '')
+      await loadEntries($)
+    }
+
     return
   }
 
-  const all = stdout
-    .split('\n')
-    .filter(name => name !== '.DS_Store' && isSafeEntry(name) && !name.slice(0, -1).includes('/'))
-  // Folders first, then files; each group keeps the order ls gave.
-  const names = [...all.filter(n => n.endsWith('/')), ...all.filter(n => !n.endsWith('/'))]
+  const shown = listing.filter(e => e.name !== '.DS_Store' && isSafeEntry(e.name))
+  // Folders first, then files. A link counts as a file: it is not followed.
+  const names = [
+    ...shown.filter(e => e.kind === 'dir').map(e => `${e.name}/`),
+    ...shown.filter(e => e.kind !== 'dir').map(e => e.name),
+  ]
+  const bytes: { [name: string]: number } = {}
+
+  for (const e of shown) {
+    if (e.kind === 'file') {
+      bytes[e.name] = e.size
+    }
+  }
 
   const hits = (await read($, searchHits)) ?? []
 
   await update($, entries, () => names)
   await update($, selected, list => list.filter(name => names.includes(name) || hits.includes(name)))
-  await update($, sizes, () => ({}))
-
-  const bytes = await sizesOf($, dir, names)
-
   await update($, sizes, () => bytes)
 }
 
 // Each file's size in bytes, by its name or path below `dir`; folders have none.
 const sizesOf = async ($: EngineInterface, dir: string, names: readonly string[]) => {
-  const files = names.filter(n => !n.endsWith('/'))
   const bytes: { [name: string]: number } = {}
+  const files = names.filter(n => !n.endsWith('/'))
+  const stats = await Promise.all(files.map(name => $.fs.stat(`${dir}/${name}`).catch(() => null)))
 
-  if (files.length > 0) {
-    // One line per file: size, a tab, the name as given (run inside the folder).
-    // "--": a name such as "-L" is a name, not an option.
-    const stat = await $.process.run(['/usr/bin/stat', '-f', '%z%t%N', '--', ...files], { cwd: dir })
+  files.forEach((name, i) => {
+    const stat = stats[i]
 
-    for (const line of stat.stdout.split('\n')) {
-      const tab = line.indexOf('\t')
-
-      if (tab > 0) {
-        bytes[line.slice(tab + 1)] = Number(line.slice(0, tab))
-      }
+    if (stat?.kind === 'file' && !stat.isLink) {
+      bytes[name] = stat.size
     }
-  }
+  })
 
   return bytes
 }
@@ -486,18 +486,14 @@ const renameFile = async ($: EngineInterface, entry: string, raw: string) => {
 
   const dir = await targetDir($)
   const toPath = parent === '' ? to : `${parent}/${to}`
-  const taken = await $.process.run(['/bin/test', '-e', `${dir}/${toPath}`])
-
-  if (taken.exitCode === 0) {
+  if (await $.fs.exists(`${dir}/${toPath}`)) {
     await update($, renameError, () => `"${to}" already exists here.`)
     return
   }
 
   const moved = await $.process.run(['/bin/mv', '-n', `${dir}/${from}`, `${dir}/${toPath}`])
   // macOS `mv -n` exits 0 even when it skipped the move: check the old name is gone.
-  const left = await $.process.run(['/bin/test', '-e', `${dir}/${from}`])
-
-  if (moved.exitCode !== 0 || left.exitCode === 0) {
+  if (moved.exitCode !== 0 || (await $.fs.exists(`${dir}/${from}`))) {
     await update($, renameError, () => `Could not rename "${oldName}".`)
     return
   }
@@ -531,9 +527,7 @@ const createFolder = async ($: EngineInterface, raw: string) => {
 
   const parent = await targetDir($)
   const path = `${parent}/${name}`
-  const exists = await $.process.run(['/bin/test', '-e', path])
-
-  if (exists.exitCode === 0) {
+  if (await $.fs.exists(path)) {
     await update($, folderError, () => `"${name}" already exists here.`)
     return
   }
@@ -697,67 +691,118 @@ const showInFinder = async ($: EngineInterface, name: string) => {
 const SEARCH_LIMIT = 500
 const SEARCH_SECONDS = 5
 
+// The home folder, for "~/" in pasted paths and for ~/Downloads.
+const homeDir = async ($: EngineInterface): Promise<string> => (await $.env.get('HOME')) ?? ''
+
+const expandHome = async ($: EngineInterface, path: string): Promise<string> =>
+  path.startsWith('~/') ? `${await homeDir($)}/${path.slice(2)}` : path
+
 // Folder names a search skips, from the "Search: skip folders" setting.
 let skipFolders: string[] = parseSkipList('.git, .svn, .hg, node_modules, bower_components')
 
-// Prints the files and folders below the current folder whose own name holds
-// $1 (case ignored), one path per line, a folder's ending in "/". In a git
-// project it asks git (tracked and new files, .gitignore applied), otherwise
-// it lists the folders with find, which reads names only, never follows
-// links and stays on this disk. The other arguments are folder names to
-// skip. It stops after one result more than the limit, and after the time
-// limit, then prints "#TIMEOUT". It runs in its own process group, so the
-// time limit stops all of it.
-const SEARCH_SCRIPT = `
-exec 2>/dev/null
-Q=$1; LIMIT=$2; SECONDS_MAX=$3; shift 3
-SKIP=$(printf '%s\\n' "$@"); export Q SKIP
-out=$(/usr/bin/mktemp -t file-copy-search) || exit 2
-n0=$#
-for name in "$@"; do set -- "$@" -o -name "$name"; done
-# Names with a line break are skipped: they would split into two lines.
-NL='
-'
-set -- "$@" -o -name "*$NL*"
-shift "$n0"
-shift
-# Its own process group, so the time limit stops every process of the search.
-set -m
-(
-  # fsmonitor off: a repository's config must not start a program.
-  # quotePath off: names with umlauts stay as they are; git still quotes
-  # names with control characters, and those lines are dropped.
-  if /usr/bin/git -c core.fsmonitor=false rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    /usr/bin/git -c core.fsmonitor=false -c core.quotePath=false ls-files -co --exclude-standard 2>/dev/null |
-      /usr/bin/grep -v '^"' |
-      /usr/bin/awk '{ print; p = $0
-        while (match(p, /\\/[^\\/]*$/) > 0) { p = substr(p, 1, RSTART - 1)
-          if (!(p in seen)) { seen[p] = 1; print p "/" } } }'
-  else
-    /usr/bin/find . -xdev \\( "$@" \\) -prune -o -type d -print 2>/dev/null | /usr/bin/sed 's|$|/|'
-    /usr/bin/find . -xdev \\( "$@" \\) -prune -o ! -type d -print 2>/dev/null
-  fi |
-  /usr/bin/awk 'BEGIN { q = tolower(ENVIRON["Q"]); n = split(ENVIRON["SKIP"], s, "\\n")
-      for (i = 1; i <= n; i++) if (s[i] != "") skip[s[i]] = 1 }
-    { sub(/^\\.\\//, ""); if ($0 == "" || $0 == "." || $0 == "./") next
-      p = $0; sub(/\\/$/, "", p); k = split(p, part, "/")
-      for (i = 1; i <= k; i++) if (part[i] in skip) next
-      if (part[k] == ".DS_Store") next
-      if (index(tolower(part[k]), q) > 0) print }' |
-  /usr/bin/head -n $((LIMIT + 1)) > "$out"
-) &
-pid=$!
-ticks=0
-while kill -0 "$pid" 2>/dev/null; do
-  if [ "$ticks" -ge $((SECONDS_MAX * 10)) ]; then
-    kill -TERM -- -"$pid" 2>/dev/null; timedout=1; break
-  fi
-  /bin/sleep 0.1; ticks=$((ticks + 1))
-done
-wait "$pid" 2>/dev/null
-/bin/cat "$out"; /bin/rm -f "$out"
-if [ -n "$timedout" ]; then echo "#TIMEOUT"; fi
-`
+// Whether a name holds the search text, case ignored ("ÄP" finds "Äpfel").
+const nameHolds = (name: string, query: string): boolean =>
+  name.toLowerCase().includes(query.toLowerCase())
+
+type Found = { paths: string[]; isTimedOut: boolean; isCut: boolean }
+
+// In a git project: what git tracks, and new files .gitignore lets through.
+// Git runs with fsmonitor off, so a repository's config cannot start a
+// program; -z gives each path as it is, with no quoting to undo.
+const searchGit = async ($: EngineInterface, dir: string, query: string): Promise<Found | null> => {
+  const git = ['/usr/bin/git', '-c', 'core.fsmonitor=false']
+  const inside = await $.process
+    .run([...git, 'rev-parse', '--is-inside-work-tree'], { cwd: dir })
+    .catch(() => null)
+
+  if (inside === null || inside.exitCode !== 0 || inside.stdout.trim() !== 'true') {
+    return null
+  }
+
+  const listed = await $.process
+    .run([...git, 'ls-files', '-z', '-co', '--exclude-standard'], {
+      cwd: dir,
+      timeoutMs: SEARCH_SECONDS * 1000,
+    })
+    .catch(() => null)
+
+  if (listed === null) {
+    return { paths: [], isTimedOut: true, isCut: false }
+  }
+
+  const skip = new Set(skipFolders)
+  const seen = new Set<string>()
+  const paths: string[] = []
+  const add = (path: string) => {
+    const parts = path.replace(/\/$/, '').split('/')
+
+    if (
+      !seen.has(path) &&
+      isSafeEntry(path) &&
+      !parts.some(part => skip.has(part)) &&
+      parts[parts.length - 1] !== '.DS_Store' &&
+      nameHolds(parts[parts.length - 1] ?? '', query)
+    ) {
+      paths.push(path)
+    }
+
+    seen.add(path)
+  }
+
+  for (const file of listed.stdout.split('\0')) {
+    if (file === '') {
+      continue
+    }
+
+    // Each folder above the file, then the file.
+    const parts = file.split('/')
+
+    for (let i = 1; i < parts.length; i += 1) {
+      add(`${parts.slice(0, i).join('/')}/`)
+    }
+
+    add(file)
+  }
+
+  return { paths, isTimedOut: false, isCut: listed.isStdoutTruncated }
+}
+
+// Elsewhere: the mod walks the folders itself with $.fs.list, shallow first.
+// It reads names only, never follows a link, skips the setting's folders, and
+// stops after one result more than the limit or after the time limit.
+const searchWalk = async ($: EngineInterface, dir: string, query: string): Promise<Found> => {
+  const skip = new Set(skipFolders)
+  const deadline = (await $.clock.now()) + SEARCH_SECONDS * 1000
+  const paths: string[] = []
+  const queue = ['']
+
+  while (queue.length > 0 && paths.length <= SEARCH_LIMIT) {
+    if ((await $.clock.now()) > deadline) {
+      return { paths, isTimedOut: true, isCut: false }
+    }
+
+    const folder = queue.shift() ?? ''
+    const listing = await $.fs.list(folder === '' ? dir : `${dir}/${folder}`).catch(() => [])
+
+    for (const e of listing) {
+      const path = folder === '' ? e.name : `${folder}/${e.name}`
+
+      if (skip.has(e.name) || e.name === '.DS_Store' || !isSafeEntry(path)) {
+        continue
+      }
+
+      if (nameHolds(e.name, query)) {
+        paths.push(e.kind === 'dir' ? `${path}/` : path)
+      }
+
+      if (e.kind === 'dir') {
+        queue.push(path)
+      }
+    }
+  }
+
+  return { paths, isTimedOut: false, isCut: false }
+}
 
 // Find: searches the target and every folder below it for names that hold
 // the text; an empty text shows the target alone again.
@@ -780,27 +825,12 @@ const runSearch = async ($: EngineInterface, text: string) => {
 
   try {
     const dir = await targetDir($)
-    const { stdout } = await $.process.run(
-      [
-        '/bin/sh',
-        '-c',
-        SEARCH_SCRIPT,
-        'file-copy-macos',
-        query,
-        String(SEARCH_LIMIT),
-        String(SEARCH_SECONDS),
-        ...skipFolders,
-      ],
-      { cwd: dir, env: { LC_ALL: 'en_US.UTF-8' }, timeoutMs: (SEARCH_SECONDS + 10) * 1000 },
-    )
-    const lines = stdout.split('\n').filter(line => line !== '')
-    const isTimedOut = lines.includes('#TIMEOUT')
-    const found = lines.filter(line => line !== '#TIMEOUT' && isSafeEntry(line))
-    const hits = found.slice(0, SEARCH_LIMIT)
+    const found = (await searchGit($, dir, query)) ?? (await searchWalk($, dir, query))
+    const hits = found.paths.slice(0, SEARCH_LIMIT)
     const note =
-      found.length > SEARCH_LIMIT
+      found.paths.length > SEARCH_LIMIT || found.isCut
         ? `More than ${SEARCH_LIMIT} results: showing the first ${SEARCH_LIMIT}. Use a longer search text.`
-        : isTimedOut
+        : found.isTimedOut
           ? `The search stopped after ${SEARCH_SECONDS} seconds: the results may be incomplete.`
           : null
 
@@ -927,14 +957,6 @@ const pickPaths = async ($: EngineInterface, kind: PickKind): Promise<string[]> 
 }
 
 // Removes one pasted path: the field is drawn again with the paths left.
-// Prints each argument that is a folder; "~/" is the home folder.
-const DIRS_SCRIPT = `
-for p in "$@"; do
-  case "$p" in "~/"*) q="$HOME/\${p#??}" ;; *) q=$p ;; esac
-  [ -d "$q" ] && printf '%s\\n' "$p"
-done
-`
-
 const checkPastedDirs = async ($: EngineInterface, text: string) => {
   const paths = parsePaths(text)
 
@@ -943,8 +965,11 @@ const checkPastedDirs = async ($: EngineInterface, text: string) => {
     return
   }
 
-  const { stdout } = await $.process.run(['/bin/sh', '-c', DIRS_SCRIPT, 'file-copy-macos', ...paths])
-  const dirs = stdout.split('\n').filter(line => line !== '')
+  // A path that leads to a folder, a link to one included.
+  const kinds = await Promise.all(
+    paths.map(async path => (await $.fs.stat(await expandHome($, path)).catch(() => null))?.kind),
+  )
+  const dirs = paths.filter((_, i) => kinds[i] === 'dir')
 
   // A later edit may have changed the field meanwhile: keep only its paths.
   const now = parsePaths(await read($, draft))
@@ -978,35 +1003,36 @@ const pickAndCopy = async ($: EngineInterface, kind: PickKind) => {
   }
 }
 
-// Prints the newest item in ~/Downloads, file or folder, skipping Finder's
-// own files and downloads still in progress; exit 2 when there is none.
-const LATEST_DOWNLOAD_SCRIPT = `
-cd "$HOME/Downloads" 2>/dev/null || exit 2
-/bin/ls -1tA | while IFS= read -r name; do
-  case "$name" in
-    .DS_Store|.localized|*.crdownload|*.download|*.part|*.partial) continue ;;
-  esac
-  printf '%s/%s\\n' "$PWD" "$name"
-  exit 0
-done | /usr/bin/grep . || exit 2
-`
+// Downloads still in progress, and Finder's own files: never the newest.
+const isNotDownloaded = (name: string): boolean =>
+  name === '.DS_Store' ||
+  name === '.localized' ||
+  /\.(crdownload|download|part|partial)$/.test(name)
 
+// The newest file or folder in ~/Downloads. A listing knows a file's time;
+// a folder's comes from $.fs.stat.
 const copyLatestDownload = async ($: EngineInterface) => {
-  const { stdout, exitCode } = await $.process.run([
-    '/bin/sh',
-    '-c',
-    LATEST_DOWNLOAD_SCRIPT,
-    'file-copy-macos',
-  ])
-  const path = stdout.split('\n')[0] ?? ''
+  const downloads = `${await homeDir($)}/Downloads`
+  const listing = await $.fs.list(downloads).catch(() => [])
+  const items = listing.filter(e => !isNotDownloaded(e.name) && isSafeEntry(e.name))
+  const times = await Promise.all(
+    items.map(async e =>
+      e.kind === 'file'
+        ? e.mtimeMs
+        : ((await $.fs.stat(`${downloads}/${e.name}`).catch(() => null))?.mtimeMs ?? 0),
+    ),
+  )
+  const newest = items
+    .map((e, i) => ({ name: e.name, time: times[i] ?? 0 }))
+    .sort((a, b) => b.time - a.time)[0]
 
-  if (exitCode !== 0 || path === '') {
+  if (newest === undefined) {
     $.ui.toast('No download found in ~/Downloads')
     return
   }
 
   await update($, hint, () => null)
-  await copyIntoProject($, [path])
+  await copyIntoProject($, [`${downloads}/${newest.name}`])
 }
 
 const loadVersion = async ($: EngineInterface) => {

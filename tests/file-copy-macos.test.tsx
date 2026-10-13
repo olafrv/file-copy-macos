@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Olaf Reitmaier
 
+import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import {
@@ -28,6 +29,59 @@ const BAND = {
 // The tick box as each surface draws it: emoji on the desktop.
 const box = (surface: 'terminal' | 'desktop', isOn: boolean) =>
   surface === 'terminal' ? (isOn ? '☑' : '☐') : isOn ? '✅' : '⬜'
+
+// A file system in memory for $.fs: `list` gives a folder's names (a
+// folder's ending in "/"), or undefined when there is no such folder; sizes
+// and modification times by full path.
+const fakeFs = (
+  on: On,
+  list: (dir: string) => readonly string[] | undefined,
+  sizes: { readonly [path: string]: number } = {},
+  times: { readonly [path: string]: number } = {},
+) => {
+  const kindOf = (path: string): 'file' | 'dir' | undefined => {
+    if (list(path) !== undefined) {
+      return 'dir'
+    }
+
+    const cut = path.lastIndexOf('/')
+    const names = list(path.slice(0, cut)) ?? []
+    const name = path.slice(cut + 1)
+
+    return names.includes(`${name}/`) ? 'dir' : names.includes(name) ? 'file' : undefined
+  }
+
+  on('fs.list', ($, e) => {
+    const names = list(e.path)
+
+    if (names === undefined) {
+      return { deny: `no such folder: ${e.path}` }
+    }
+
+    return {
+      value: names.map(n => {
+        const name = n.replace(/\/$/, '')
+        const isDir = n.endsWith('/')
+
+        return {
+          name,
+          kind: isDir ? 'dir' : 'file',
+          size: isDir ? 0 : (sizes[`${e.path}/${name}`] ?? 0),
+          mtimeMs: isDir ? 0 : (times[`${e.path}/${name}`] ?? 0),
+          isLink: false,
+        }
+      }),
+    }
+  })
+  on('fs.exists', ($, e) => ({ value: kindOf(e.path) !== undefined }))
+  on('fs.stat', ($, e) => {
+    const kind = kindOf(e.path)
+
+    return kind === undefined
+      ? { deny: `no such path: ${e.path}` }
+      : { value: { kind, size: sizes[e.path] ?? 0, mtimeMs: times[e.path] ?? 0, isLink: false } }
+  })
+}
 
 const ran = (stdout: string) => ({
   exitCode: 0,
@@ -186,14 +240,8 @@ test('the file list deletes ticked files only after a confirmation', async ($, o
   let folder = ['a.pdf', 'b.pdf', 'docs/', '.DS_Store']
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? folder : undefined))
   on('process.run', ($, e) => {
-    if (e.argv[0] === '/bin/ls') {
-      // -q and UTF-8: a line break in a name cannot split it; umlauts stay.
-      expect(e.argv.slice(0, 2)).toEqual(['/bin/ls', '-1Apq'])
-      expect(e.init?.env?.LC_ALL).toBe('en_US.UTF-8')
-      return { value: ran(folder.join('\n') + '\n') }
-    }
-
     if (e.argv[0] === '/usr/bin/trash') {
       const path = e.argv[1] ?? ''
       trashed.push(path)
@@ -333,20 +381,11 @@ test('Contents opens folders, makes them the target and creates new ones', async
   const runs: (readonly string[])[] = []
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => folders[dir])
   on('process.run', ($, e) => {
     runs.push(e.argv)
     const cmd = e.argv[0]
     const path = e.argv[e.argv.length - 1] ?? ''
-
-    if (cmd === '/bin/ls') {
-      const list = folders[path]
-
-      return { value: list ? ran(list.join('\n') + '\n') : { ...ran(''), exitCode: 1 } }
-    }
-
-    if (cmd === '/bin/test') {
-      return { value: { ...ran(''), exitCode: path in folders ? 0 : 1 } }
-    }
 
     if (cmd === '/bin/mkdir') {
       const target = path
@@ -403,17 +442,10 @@ test('Contents renames a file, never over another one', async ($, on) => {
   const moves: (readonly string[])[] = []
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? folder : undefined))
   on('process.run', ($, e) => {
     const [cmd] = e.argv
     const last = e.argv[e.argv.length - 1] ?? ''
-
-    if (cmd === '/bin/ls') {
-      return { value: ran(folder.join('\n') + '\n') }
-    }
-
-    if (cmd === '/bin/test') {
-      return { value: { ...ran(''), exitCode: folder.includes(last.slice('/proj/'.length)) ? 0 : 1 } }
-    }
 
     if (cmd === '/bin/mv') {
       moves.push(e.argv)
@@ -520,11 +552,8 @@ test('Folder... opens the folder picker and copies the folders', async ($, on) =
 
 test('the pasted list shows folders with a folder icon and counts items', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
-  on('process.run', ($, e) => {
-    const isDirCheck = e.argv[0] === '/bin/sh' && (e.argv[2] ?? '').includes('[ -d')
-
-    return { value: ran(isDirCheck ? '/src/Photos\n' : '') }
-  })
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/src' ? ['Photos/', 'a.pdf'] : dir === '/src/Photos' ? [] : undefined))
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
@@ -540,7 +569,8 @@ test('the pasted list shows folders with a folder icon and counts items', async 
 
 test('the Contents label and folder rows use emoji on every surface', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
-  on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/ls' ? 'docs/\n' : '') }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? ['docs/'] : undefined))
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
@@ -557,12 +587,13 @@ test('Open opens a file with its default app, a folder and the target in Finder'
   const opened: (readonly string[])[] = []
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf'] : undefined))
   on('process.run', ($, e) => {
     if (e.argv[0] === '/usr/bin/open') {
       opened.push(e.argv)
     }
 
-    return { value: ran(e.argv[0] === '/bin/ls' ? 'docs/\na.pdf\n' : '') }
+    return { value: ran('') }
   })
 
   const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
@@ -594,19 +625,10 @@ test('sizes read as Finder shows them', async () => {
 
 test('Contents shows each file size and none for folders', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
-  on('process.run', ($, e) => {
-    if (e.argv[0] === '/bin/ls') {
-      return { value: ran('docs/\na.pdf\nMy File.txt\n') }
-    }
-
-    if (e.argv[0] === '/usr/bin/stat') {
-      expect(e.argv.slice(3)).toEqual(['--', 'a.pdf', 'My File.txt'])
-      expect(e.init?.cwd).toBe('/proj')
-
-      return { value: ran('13422\ta.pdf\n512\tMy File.txt\n') }
-    }
-
-    return { value: ran('') }
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf', 'My File.txt'] : undefined), {
+    '/proj/a.pdf': 13422,
+    '/proj/My File.txt': 512,
   })
 
   const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
@@ -642,11 +664,8 @@ test('the file list deletes ticked folders with their contents after a confirmat
   let folder = ['a.pdf', 'docs/', 'old/']
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? folder : undefined))
   on('process.run', ($, e) => {
-    if (e.argv[0] === '/bin/ls') {
-      return { value: ran(folder.join('\n') + '\n') }
-    }
-
     if (e.argv[0] === '/usr/bin/trash') {
       const path = e.argv[1] ?? ''
       trashed.push(path)
@@ -703,19 +722,10 @@ test('Contents renames a folder, never over another one', async ($, on) => {
   const bare = (path: string) => path.slice('/proj/'.length)
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? folder : undefined))
   on('process.run', ($, e) => {
     const [cmd] = e.argv
     const last = e.argv[e.argv.length - 1] ?? ''
-
-    if (cmd === '/bin/ls') {
-      return { value: ran(folder.join('\n') + '\n') }
-    }
-
-    if (cmd === '/bin/test') {
-      const name = bare(last)
-      const exists = folder.includes(name) || folder.includes(`${name}/`)
-      return { value: { ...ran(''), exitCode: exists ? 0 : 1 } }
-    }
 
     if (cmd === '/bin/mv') {
       moves.push(e.argv)
@@ -764,13 +774,9 @@ test('Contents shows 4 entries per page and keeps ticks across pages', async ($,
   let folder = [...start]
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? folder : dir.startsWith('/proj/') ? [] : undefined))
   on('process.run', ($, e) => {
     const [cmd] = e.argv
-
-    if (cmd === '/bin/ls') {
-      const dir = e.argv[e.argv.length - 1] ?? ''
-      return { value: ran(dir === '/proj' ? folder.join('\n') + '\n' : '') }
-    }
 
     if (cmd === '/usr/bin/trash') {
       const path = e.argv[1] ?? ''
@@ -841,16 +847,12 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
   const long = 'A very long file name that does not fit into the name column at all.pdf'
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf', long] : undefined), {
+    '/proj/a.pdf': 13000,
+    [`/proj/${long}`]: 2000000,
+  })
   on('process.run', ($, e) => {
     const [cmd] = e.argv
-
-    if (cmd === '/bin/ls') {
-      return { value: ran(`docs/\na.pdf\n${long}\n`) }
-    }
-
-    if (cmd === '/usr/bin/stat') {
-      return { value: ran(`13000\ta.pdf\n2000000\t${long}\n`) }
-    }
 
     if (cmd === '/usr/bin/open') {
       opened.push(e.argv[1] ?? '')
@@ -928,16 +930,11 @@ test('the list filters by name and sorts folders first, by name or size', async 
 
 test('Contents sorts by a header click and filters by name', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
-  on('process.run', ($, e) => {
-    if (e.argv[0] === '/bin/ls') {
-      return { value: ran('docs/\nbig.zip\nsmall.txt\nmid.pdf\n') }
-    }
-
-    if (e.argv[0] === '/usr/bin/stat') {
-      return { value: ran('9000\tbig.zip\n10\tsmall.txt\n500\tmid.pdf\n') }
-    }
-
-    return { value: ran('') }
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'big.zip', 'small.txt', 'mid.pdf'] : undefined), {
+    '/proj/big.zip': 9000,
+    '/proj/small.txt': 10,
+    '/proj/mid.pdf': 500,
   })
 
   const rows = async (ui: { find: (q: object) => Promise<unknown> }) => {
@@ -999,14 +996,24 @@ test('Contents sorts by a header click and filters by name', async ($, on) => {
 
 test('Latest download copies the newest item of ~/Downloads', async ($, on) => {
   const copies: (readonly string[])[] = []
-  let newest = '/Users/me/Downloads/report.pdf\n'
+  // A file still downloading is never the newest; a folder's time comes from stat.
+  let downloads = ['report.pdf', 'old.txt', 'photos/', 'big.iso.crdownload', '.DS_Store']
 
+  mock.env(on, { HOME: '/Users/me' })
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(
+    on,
+    dir => (dir === '/Users/me/Downloads' ? downloads : dir === '/Users/me/Downloads/photos' ? [] : undefined),
+    {},
+    {
+      '/Users/me/Downloads/report.pdf': 300,
+      '/Users/me/Downloads/old.txt': 100,
+      '/Users/me/Downloads/photos': 200,
+      '/Users/me/Downloads/big.iso.crdownload': 900,
+      '/Users/me/Downloads/.DS_Store': 950,
+    },
+  )
   on('process.run', ($, e) => {
-    if (e.argv[0] === '/bin/sh' && String(e.argv[2]).includes('Downloads')) {
-      return { value: { ...ran(newest), exitCode: newest === '' ? 2 : 0 } }
-    }
-
     if (e.argv[0] === '/bin/sh' && e.argv[5] === 'check') {
       return { value: ran('') }
     }
@@ -1024,9 +1031,15 @@ test('Latest download copies the newest item of ~/Downloads', async ($, on) => {
   expect(copies).toEqual([['/proj', 'keep', '/Users/me/Downloads/report.pdf']])
   expect(await ui.find({ type: 'Text', text: 'report.pdf' })).toBeDefined()
 
-  newest = ''
+  // Without the file, the folder is the newest.
+  downloads = ['old.txt', 'photos/']
   await ui.press({ key: 'latest-download' })
-  expect(copies.length).toBe(1)
+  expect(copies[1]).toEqual(['/proj', 'keep', '/Users/me/Downloads/photos'])
+
+  // Nothing to copy: no copy.
+  downloads = ['.DS_Store', 'x.part']
+  await ui.press({ key: 'latest-download' })
+  expect(copies.length).toBe(2)
   await ui.unmount()
 })
 
@@ -1071,13 +1084,10 @@ test('Ask puts @paths into the prompt; the header tick selects all shown', async
   const fills: { text: string; mode: string }[] = []
 
   on('session.root', () => ({ value: '/proj' }))
-  on('process.run', ($, e) => {
-    if (e.argv[0] === '/bin/ls') {
-      return { value: ran(e.argv[2] === '/proj' ? 'docs/\na.pdf\nMy File.txt\n' : 'q1.csv\n') }
-    }
-
-    return { value: ran('') }
-  })
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir =>
+    dir === '/proj' ? ['docs/', 'a.pdf', 'My File.txt'] : dir === '/proj/docs' ? ['q1.csv'] : undefined,
+  )
   on('prompt.fill', ($, e) => {
     fills.push({ text: e.text, mode: e.mode })
     return { isFilled: true, text: e.text, cursor: e.text.length }
@@ -1137,11 +1147,8 @@ test('Copy puts items on the clipboard, also the ticked ones; Finder selects one
   const runs: (readonly string[])[] = []
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf', 'My File.txt'] : undefined))
   on('process.run', ($, e) => {
-    if (e.argv[0] === '/bin/ls') {
-      return { value: ran('docs/\na.pdf\nMy File.txt\n') }
-    }
-
     if (e.argv[0] === '/usr/bin/osascript' || e.argv[0] === '/usr/bin/open') {
       runs.push(e.argv)
       return { value: ran(e.argv[0] === '/usr/bin/osascript' ? `${e.argv.length - 5}\n` : '') }
@@ -1234,35 +1241,51 @@ test('the In Finder row names both ways from Finder; the terminal also names dra
   await terminal.unmount()
 })
 
-test('Find searches subfolders: Folder column, warnings, rename in place', { options: { searchSkip: '.venv, dist/' } }, async ($, on) => {
-  const searches: (readonly string[])[] = []
+test('Find searches subfolders with git: Folder column, warnings, rename in place', { options: { searchSkip: '.venv, dist/' } }, async ($, on) => {
+  const gits: { argv: readonly string[]; cwd?: string }[] = []
   const moves: (readonly string[])[] = []
   const fills: string[] = []
-  let found = 'docs/2026/report.pdf\ndocs/old/\narchive/x/report-old.pdf\n'
+  let files = [
+    'docs/2026/report.pdf',
+    'docs/reports/a.txt',
+    'archive/x/report-old.pdf',
+    '.venv/lib/report.py',
+    'dist/report.js',
+    'notes.md',
+  ]
+  let isSlow = false
+  const tree: Record<string, string[]> = {
+    '/proj': ['docs/', 'archive/', 'notes.md'],
+    '/proj/docs': ['2026/', 'reports/'],
+    '/proj/docs/2026': ['report.pdf'],
+    '/proj/docs/reports': ['a.txt'],
+    '/proj/archive': ['x/'],
+    '/proj/archive/x': ['report-old.pdf'],
+  }
 
   on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => tree[dir], { '/proj/docs/2026/report.pdf': 13000 })
   on('process.run', ($, e) => {
     const [cmd] = e.argv
 
-    if (cmd === '/bin/sh' && String(e.argv[2]).includes('ls-files -co')) {
-      searches.push(e.argv.slice(4))
-      return { value: ran(found) }
-    }
+    if (cmd === '/usr/bin/git') {
+      gits.push({ argv: e.argv, cwd: e.init?.cwd })
 
-    if (cmd === '/bin/ls') {
-      return { value: ran(e.argv[2] === '/proj' ? 'docs/\narchive/\n' : 'report.pdf\n') }
-    }
+      if (e.argv.includes('rev-parse')) {
+        return { value: ran('true\n') }
+      }
 
-    if (cmd === '/usr/bin/stat') {
-      return { value: ran('13000\tdocs/2026/report.pdf\n9000\tarchive/x/report-old.pdf\n') }
-    }
-
-    if (cmd === '/bin/test') {
-      return { value: { ...ran(''), exitCode: 1 } }
+      return isSlow ? { deny: 'timed out' } : { value: ran(files.map(f => `${f}\0`).join('')) }
     }
 
     if (cmd === '/bin/mv') {
       moves.push(e.argv)
+      // Move the name in its folder, as mv would.
+      const [from = '', to = ''] = e.argv.slice(2)
+      const folder = from.slice(0, from.lastIndexOf('/'))
+      tree[folder] = (tree[folder] ?? []).map(n =>
+        n === from.slice(folder.length + 1) ? to.slice(to.lastIndexOf('/') + 1) : n,
+      )
     }
 
     return { value: ran('') }
@@ -1274,17 +1297,26 @@ test('Find searches subfolders: Folder column, warnings, rename in place', { opt
 
   const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
 
-  // Find (Enter) opens the list and searches with the text, the limits and
-  // the folders of the setting.
+  // Find (Enter) opens the list and asks git, with fsmonitor off, for what
+  // it tracks and the new files .gitignore lets through.
   await ui.input({ key: 'filter-0', text: 'report' })
-  expect(searches[0]).toEqual(['report', '500', '5', '.venv', 'dist'])
+  expect(gits[1]).toEqual({
+    argv: ['/usr/bin/git', '-c', 'core.fsmonitor=false', 'ls-files', '-z', '-co', '--exclude-standard'],
+    cwd: '/proj',
+  })
   expect(await ui.find({ key: 'sort-folder' })).toBeDefined()
+  // Files and folders whose own name holds the text; not in .venv or dist.
+  expect(await ui.find({ key: 'file:docs/2026/report.pdf' })).toBeDefined()
+  expect(await ui.find({ key: 'dir:docs/reports/' })).toBeDefined()
+  expect(await ui.find({ key: 'file:archive/x/report-old.pdf' })).toBeDefined()
+  expect(await ui.find({ key: 'file:.venv/lib/report.py' })).toBeUndefined()
+  expect(await ui.find({ key: 'file:dist/report.js' })).toBeUndefined()
   expect((await ui.find({ key: 'file:docs/2026/report.pdf' }))?.props.label).toBe('📄 report.pdf')
   expect((await ui.find({ key: 'folder:docs/2026/report.pdf' }))?.props.label).toBe('docs/2026')
   // The full folder, revealed while the pointer is over the cell.
   const tip = await ui.find({ type: 'Text', text: ' /proj/docs/2026 ' })
   expect(tip?.props.inverse).toBe(true)
-  expect((await ui.find({ key: 'dir:docs/old/' }))?.props.label).toBe('📁 old/')
+  expect((await ui.find({ key: 'dir:docs/reports/' }))?.props.label).toBe('📁 reports/')
   expect(await ui.find({ type: 'Text', text: '13 KB' })).toBeDefined()
 
   // Ask writes the path from the project.
@@ -1304,8 +1336,8 @@ test('Find searches subfolders: Folder column, warnings, rename in place', { opt
   expect(await ui.find({ key: 'dir:docs/' })).toBeDefined()
 
   // More than 500 results: the first 500 and a warning.
-  found = Array.from({ length: 501 }, (_, i) => `a/f${i}.txt`).join('\n')
-  await ui.input({ key: 'filter-0', text: 'f' })
+  files = Array.from({ length: 501 }, (_, i) => `a/f${i}.txt`)
+  await ui.input({ key: 'filter-0', text: '.txt' })
   expect(await ui.find({ type: 'Text', text: '1/125 (#500)' })).toBeDefined()
   expect(
     await ui.find({
@@ -1314,29 +1346,71 @@ test('Find searches subfolders: Folder column, warnings, rename in place', { opt
     }),
   ).toBeDefined()
 
-  // The time limit: what was found, and a warning.
-  found = 'a/f1.txt\n#TIMEOUT\n'
+  // The time limit: git ran too long, and a warning.
+  isSlow = true
   await ui.input({ key: 'filter-0', text: 'f1' })
-  expect(await ui.find({ key: 'file:a/f1.txt' })).toBeDefined()
   expect(
     await ui.find({
       type: 'Text',
       text: '⚠ The search stopped after 5 seconds: the results may be incomplete.',
     }),
   ).toBeDefined()
+  isSlow = false
 
   // Nothing found.
-  found = ''
+  files = ['notes.md']
   await ui.input({ key: 'filter-0', text: 'zzz' })
   expect(await ui.find({ type: 'Text', text: 'Nothing found for "zzz" in this folder and below.' })).toBeDefined()
 
   // A click on a folder in the Folder column opens it, and ends the search.
-  found = 'archive/x/report-old.pdf\n'
+  files = ['archive/x/report-old.pdf']
   await ui.input({ key: 'filter-0', text: 'old' })
   await ui.press({ key: 'folder:archive/x/report-old.pdf' })
   expect(await ui.find({ key: 'sort-folder' })).toBeUndefined()
   expect(await ui.find({ key: 'up' })).toBeDefined()
 
+  await ui.unmount()
+})
+
+test('Find outside git walks the folders, skips the setting\'s folders and stops in time', { options: { searchSkip: 'node_modules, .venv' } }, async ($, on) => {
+  const tree: Record<string, string[]> = {
+    '/proj': ['src/', 'node_modules/', '.venv/', 'Readme.md'],
+    '/proj/src': ['App.tsx', 'deep/'],
+    '/proj/src/deep': ['äpfel.ts'],
+    '/proj/node_modules': ['app.js'],
+    '/proj/.venv': ['app.py'],
+  }
+  let now = 0
+  let step = 0
+
+  on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => tree[dir])
+  on('clock.now', () => ({ value: (now += step) }))
+  on('process.run', ($, e) => ({
+    value: e.argv.includes('rev-parse') ? { ...ran(''), exitCode: 128 } : ran(''),
+  }))
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+
+  // Names in any case, umlauts included; skipped folders are not entered.
+  await ui.input({ key: 'filter-0', text: 'APP' })
+  expect(await ui.find({ key: 'file:src/App.tsx' })).toBeDefined()
+  expect(await ui.find({ key: 'file:node_modules/app.js' })).toBeUndefined()
+  expect(await ui.find({ key: 'file:.venv/app.py' })).toBeUndefined()
+
+  await ui.input({ key: 'filter-0', text: 'ÄPF' })
+  expect(await ui.find({ key: 'file:src/deep/äpfel.ts' })).toBeDefined()
+
+  // Each folder read takes 2 seconds here: the walk stops after 5.
+  step = 2000
+  await ui.input({ key: 'filter-0', text: 'pfel' })
+  expect(await ui.find({ key: 'file:src/deep/äpfel.ts' })).toBeUndefined()
+  expect(
+    await ui.find({
+      type: 'Text',
+      text: '⚠ The search stopped after 5 seconds: the results may be incomplete.',
+    }),
+  ).toBeDefined()
   await ui.unmount()
 })
 
@@ -1355,7 +1429,8 @@ test('Clear goes back to page 1', async ($, on) => {
   const names = ['d1/', ...Array.from({ length: 9 }, (_, i) => `f${i + 1}.txt`)]
 
   on('session.root', () => ({ value: '/proj' }))
-  on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/ls' ? names.join('\n') + '\n' : '') }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? names : undefined))
 
   const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
   await ui.input({ key: 'filter-0', text: 'f', kind: 'change' })
