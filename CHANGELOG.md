@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.13.6
+
+- Shorter labels: "📚 Contents:" is now "📚 Content:", and "💡 In Finder:" is now "💡 Finder:".
+- The label column is only as wide as the longest label, so less space is lost after the labels (11 cells in the terminal, 10 on the desktop).
+
 ## 1.13.5
 
 - Shorter buttons: 📄 Files, 📂 Folder and 🗂️ New folder lose their "...".
