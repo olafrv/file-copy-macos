@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.1
+
+- Security: a search in a repository with a hostile `.git/config` (`core.fsmonitor`) could start a program. Git now runs with that setting off.
+- Security: a file name with a line break could show up as a fake `..` entry, and Delete would then move the parent folder to the Trash. Such names can no longer split, and every entry is checked before it is shown.
+- Fixed: a file name starting with "-" (for example `-L`) showed a wrong size.
+- Fixed: names with umlauts (for example `Bär.txt`) were escaped in search results. The search now also matches umlauts in any case.
+- 🧹 Clear goes back to page 1.
+
 ## 1.12.0
 
 - 🔍 Find (or Enter) now searches the target folder and all folders below it. Typing still filters the current folder only.
