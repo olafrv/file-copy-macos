@@ -58,8 +58,23 @@ claude plugin uninstall file-copy-macos
 
 ## Requirements
 
-- macOS 15 or later. The mod uses `/usr/bin/trash`, `osascript` and `open`.
+- macOS 15 or later.
 - Claude Code with mod (function hook) support.
+
+The mod is for macOS only, because it uses these macOS commands:
+
+| Command | Used for |
+| --- | --- |
+| `/bin/sh` with `cp -R` | Copying into the project, and the "name 2" rule for Keep both |
+| `/bin/mv` | 📝 Ren |
+| `/bin/mkdir` | 🗂️ New folder |
+| `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
+| `/usr/bin/open` | ↗️ Open and 📌 Finder |
+| `/usr/bin/osascript` | 📄 Files... and 📂 Folder... pickers, 📋 Copy and 📥 Paste (clipboard) |
+| `/bin/date` | The time zone of the clock |
+| `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
+
+Listing folders, file sizes, name checks, ⬇️ Latest download and the search outside git use Claude Code's own file access, not commands.
 
 ## What it does
 
