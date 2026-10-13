@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.1
+
+- The In Finder tip uses "->" instead of "then": "Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field".
+- The In Finder row's icon is now 💡.
+
 ## 1.11.0
 
 - The source row's label is now "Src:".
