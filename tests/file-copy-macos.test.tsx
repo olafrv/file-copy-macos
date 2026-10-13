@@ -198,9 +198,9 @@ test('the file list deletes ticked files only after a confirmation', async ($, o
     expect(await ui.find({ key: 'dir:docs/' })).toBeDefined()
     expect(await ui.find({ key: 'file:.DS_Store' })).toBeUndefined()
 
-    await ui.press({ key: 'file:a.pdf' })
-    await ui.press({ key: 'file:b.pdf' })
-    await ui.press({ key: 'file:b.pdf' })
+    await ui.press({ key: 'tick:a.pdf' })
+    await ui.press({ key: 'tick:b.pdf' })
+    await ui.press({ key: 'tick:b.pdf' })
     await ui.press({ key: 'delete-selected' })
     expect(trashed).toEqual([])
     expect(await ui.find({ type: 'Text', text: 'Delete the selected file?' })).toBeDefined()
@@ -660,7 +660,7 @@ test('the file list deletes ticked folders with their contents after a confirmat
     expect(trashed).toEqual([])
 
     await ui.press({ key: 'tick:old/' })
-    await ui.press({ key: 'file:a.pdf' })
+    await ui.press({ key: 'tick:a.pdf' })
     await ui.press({ key: 'delete-selected' })
     expect(
       await ui.find({
@@ -779,7 +779,7 @@ test('Contents shows 5 entries per page and keeps ticks across pages', async ($,
     expect(await ui.find({ key: 'file:f4.txt' })).toBeUndefined()
     expect(await ui.find({ key: 'page-prev' })).toBeUndefined()
 
-    await ui.press({ key: 'file:f1.txt' })
+    await ui.press({ key: 'tick:f1.txt' })
     await ui.press({ key: 'page-next' })
     expect(await ui.find({ type: 'Text', text: 'Page 2 of 3 (11 items)' })).toBeDefined()
     expect(await ui.find({ key: 'file:f4.txt' })).toBeDefined()
@@ -790,7 +790,7 @@ test('Contents shows 5 entries per page and keeps ticks across pages', async ($,
     expect(await ui.find({ key: 'page-next' })).toBeUndefined()
 
     // A tick from page 1 and one from page 3 are deleted together.
-    await ui.press({ key: 'file:f9.txt' })
+    await ui.press({ key: 'tick:f9.txt' })
     expect(await ui.find({ key: 'delete-selected' })).toBeDefined()
     await ui.press({ key: 'delete-selected' })
     await ui.press({ key: 'confirm-delete' })
@@ -815,6 +815,60 @@ test('Contents shows 5 entries per page and keeps ticks across pages', async ($,
     await ui.press({ key: 'list' })
     await ui.press({ key: 'list' })
     expect(await ui.find({ type: 'Text', text: 'Page 1 of 2 (9 items)' })).toBeDefined()
+
+    await ui.press({ key: 'list' })
+    await ui.unmount()
+  }
+})
+
+test('Contents is a table: header, tick, name, size and actions per row', async ($, on) => {
+  const opened: string[] = []
+  const long = 'A very long file name that does not fit into the name column at all.pdf'
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    const [cmd] = e.argv
+
+    if (cmd === '/bin/ls') {
+      return { value: ran(`docs/\na.pdf\n${long}\n`) }
+    }
+
+    if (cmd === '/usr/bin/stat') {
+      return { value: ran(`13000\ta.pdf\n2000000\t${long}\n`) }
+    }
+
+    if (cmd === '/usr/bin/open') {
+      opened.push(e.argv[1] ?? '')
+    }
+
+    return { value: ran('') }
+  })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    opened.length = 0
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    await ui.press({ key: 'list' })
+
+    for (const text of ['Name', 'Size', 'Actions']) {
+      expect(await ui.find({ type: 'Text', text })).toBeDefined()
+    }
+
+    expect((await ui.find({ key: 'tick:a.pdf' }))?.props.label).toBe('☐')
+    expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe('☐')
+    expect(await ui.find({ key: 'rename:docs/' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '13 KB' })).toBeDefined()
+
+    // A name too long for its column ends in "…" and fits it.
+    const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
+    expect(label.endsWith('…')).toBe(true)
+    expect([...label].length + 1).toBeLessThanOrEqual(100 - 13 - 2 - 9 - 18 - 4)
+
+    // The tick box ticks; the name opens the file.
+    await ui.press({ key: 'tick:a.pdf' })
+    expect((await ui.find({ key: 'tick:a.pdf' }))?.props.label).toBe('☑')
+    expect(opened).toEqual([])
+    await ui.press({ key: 'file:a.pdf' })
+    expect(opened).toEqual(['/proj/a.pdf'])
 
     await ui.press({ key: 'list' })
     await ui.unmount()

@@ -118,6 +118,20 @@ const pickScript = (kind: PickKind): string[] => [
 // Entries per page of the file list.
 const PAGE_SIZE = 5
 
+// The file list's columns, in terminal cells: the tick box, the size
+// ("999 KB"), the actions ("↗️ Open  📝 Rename") and the least the name gets.
+const TICK_WIDTH = 2
+const SIZE_WIDTH = 9
+const ACTIONS_WIDTH = 18
+const MIN_NAME_WIDTH = 16
+
+// An icon and a name cut to `width` cells with "…"; the icon takes 2 cells.
+const fitName = (label: string, width: number): string => {
+  const chars = [...label]
+
+  return chars.length + 1 <= width ? label : `${chars.slice(0, width - 2).join('')}…`
+}
+
 // Wide enough for "⌨ Shortcuts:" (an icon is 2 columns), so the rows line up.
 const LABEL_WIDTH = 13
 
@@ -674,6 +688,11 @@ export const register: Register = on => {
     const pageCount = Math.max(1, Math.ceil(names.length / PAGE_SIZE))
     const shownPage = Math.min(listOpen ? await read($, page) : 0, pageCount - 1)
     const pageNames = names.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE)
+    // The Name column takes what the label, the other columns and the gaps leave.
+    const nameWidth = Math.max(
+      MIN_NAME_WIDTH,
+      e.props.bodyColumns - LABEL_WIDTH - TICK_WIDTH - SIZE_WIDTH - ACTIONS_WIDTH - 4,
+    )
     const showResult = result !== null && !hidden && !isBusy && ask === null
     // The Hide button sits on the last result line drawn.
     const hideOn =
@@ -843,6 +862,18 @@ export const register: Register = on => {
                 />
               )}
               {names.length === 0 && <Text dimColor>The folder is empty.</Text>}
+              {names.length > 0 && (
+                <Box key="table-head" flexDirection="row" gap={1}>
+                  <Box width={TICK_WIDTH} />
+                  <Box width={nameWidth}>
+                    <Text dimColor>Name</Text>
+                  </Box>
+                  <Box width={SIZE_WIDTH}>
+                    <Text dimColor>Size</Text>
+                  </Box>
+                  <Text dimColor>Actions</Text>
+                </Box>
+              )}
               {pageNames.map(name =>
                 editing === name ? (
                   <Box key={`edit:${name}`} flexDirection="column">
@@ -869,62 +900,56 @@ export const register: Register = on => {
                     </Box>
                     {editError !== null && <Text color="yellow">{editError}</Text>}
                   </Box>
-                ) : name.endsWith('/') ? (
-                  <Box key={`dirrow:${name}`} flexDirection="row" gap={2}>
-                    <Box flexDirection="row" gap={1}>
+                ) : (
+                  <Box key={`row:${name}`} flexDirection="row" gap={1}>
+                    <Box width={TICK_WIDTH}>
                       <Button
                         key={`tick:${name}`}
                         label={ticked.includes(name) ? '☑' : '☐'}
                         plain
                         onPress={() => toggleSelected($, name)}
                       />
+                    </Box>
+                    <Box width={nameWidth}>
+                      {name.endsWith('/') ? (
+                        <Button
+                          key={`dir:${name}`}
+                          label={fitName(`📁 ${name}`, nameWidth)}
+                          plain
+                          onPress={() =>
+                            openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`)
+                          }
+                        />
+                      ) : (
+                        <Button
+                          key={`file:${name}`}
+                          label={fitName(`📄 ${name}`, nameWidth)}
+                          plain
+                          onPress={() => openWithDefaultApp($, name)}
+                        />
+                      )}
+                    </Box>
+                    <Box width={SIZE_WIDTH}>
+                      {sizeOf[name] !== undefined && (
+                        <Text dimColor>{humanSize(sizeOf[name])}</Text>
+                      )}
+                    </Box>
+                    <Box flexDirection="row" gap={2}>
                       <Button
-                        key={`dir:${name}`}
-                        label={`📁 ${name}`}
+                        key={`open:${name}`}
+                        label="↗️ Open"
                         plain
-                        onPress={() => openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`)}
+                        dimColor
+                        onPress={() => openWithDefaultApp($, name)}
+                      />
+                      <Button
+                        key={`rename:${name}`}
+                        label="📝 Rename"
+                        plain
+                        dimColor
+                        onPress={() => startRename($, name)}
                       />
                     </Box>
-                    <Button
-                      key={`open:${name}`}
-                      label="↗️ Open"
-                      plain
-                      dimColor
-                      onPress={() => openWithDefaultApp($, name)}
-                    />
-                    <Button
-                      key={`rename:${name}`}
-                      label="📝 Rename"
-                      plain
-                      dimColor
-                      onPress={() => startRename($, name)}
-                    />
-                  </Box>
-                ) : (
-                  <Box key={`row:${name}`} flexDirection="row" gap={2}>
-                    <Button
-                      key={`file:${name}`}
-                      label={`${ticked.includes(name) ? '☑' : '☐'} 📄 ${name}`}
-                      plain
-                      onPress={() => toggleSelected($, name)}
-                    />
-                    {sizeOf[name] !== undefined && (
-                      <Text dimColor>{humanSize(sizeOf[name])}</Text>
-                    )}
-                    <Button
-                      key={`open:${name}`}
-                      label="↗️ Open"
-                      plain
-                      dimColor
-                      onPress={() => openWithDefaultApp($, name)}
-                    />
-                    <Button
-                      key={`rename:${name}`}
-                      label="📝 Rename"
-                      plain
-                      dimColor
-                      onPress={() => startRename($, name)}
-                    />
                   </Box>
                 ),
               )}
