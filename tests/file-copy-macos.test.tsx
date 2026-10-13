@@ -357,7 +357,7 @@ test('Enter with no path shows a hint and copies nothing', async ($, on) => {
   }
 })
 
-test('Files... never shows the no-path hint', async ($, on) => {
+test('Files never shows the no-path hint', async ($, on) => {
   const clock = mock.clock(on, { now: 100_000 })
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
@@ -534,7 +534,7 @@ test('Copy only new shows the kept files as Skipped, not as Failed', async ($, o
   await ui.unmount()
 })
 
-test('Folder... opens the folder picker and copies the folders', async ($, on) => {
+test('Folder opens the folder picker and copies the folders', async ($, on) => {
   mock.clock(on, { now: 100_000 })
   const scripts: string[] = []
   const copies: (readonly string[])[] = []
@@ -1009,7 +1009,7 @@ test('Contents sorts by a header click and filters by name', async ($, on) => {
   }
 })
 
-test('Latest download copies the newest item of ~/Downloads', async ($, on) => {
+test('🧲 Download copies the newest item of ~/Downloads', async ($, on) => {
   const copies: (readonly string[])[] = []
   // A file still downloading is never the newest; a folder's time comes from stat.
   let downloads = ['report.pdf', 'old.txt', 'photos/', 'big.iso.crdownload', '.DS_Store']
@@ -1064,10 +1064,10 @@ test('the clock reads the zone from macOS and shows date, time and zone', async 
   expect(parseZone('')).toEqual({ offset: 0, name: 'UTC' })
 
   // 12:32:15 UTC is 14:32 in CEST; seconds are not shown.
-  expect(formatClock(Date.UTC(2026, 9, 13, 12, 32, 15), 120, 'CEST')).toBe('Tue 13.10.2026 14:32 CEST')
+  expect(formatClock(Date.UTC(2026, 9, 13, 12, 32, 15), 120, 'CEST')).toBe('13.10.2026 14:32 CEST')
   // Late UTC evening is already the next day east of UTC, and the day before west of it.
-  expect(formatClock(Date.UTC(2025, 11, 31, 23, 30), 60, 'CET')).toBe('Thu 01.01.2026 00:30 CET')
-  expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('Wed 31.12.2025 21:00 EST')
+  expect(formatClock(Date.UTC(2025, 11, 31, 23, 30), 60, 'CET')).toBe('01.01.2026 00:30 CET')
+  expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('31.12.2025 21:00 EST')
 })
 
 test('the In Finder row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
@@ -1081,15 +1081,15 @@ test('the In Finder row shows the clock on both surfaces, the version on the des
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '13.10.2026 14:32 CEST' })).toBeDefined()
     // On the desktop a middle dot, then the version as a link, all in the
     // clock's own Text, so no gap of the row widens the space before the dot.
     const version = await ui.find({ type: 'Link' })
     expect(version?.children).toEqual(surface === 'desktop' ? ['v9.8.7'] : undefined)
-    const clock = await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })
+    const clock = await ui.find({ type: 'Text', text: '13.10.2026 14:32 CEST' })
     const parts = (clock?.children ?? []).filter(c => typeof c === 'string')
     expect(parts).toEqual(
-      surface === 'desktop' ? ['Tue 13.10.2026 14:32 CEST', ' · '] : ['Tue 13.10.2026 14:32 CEST'],
+      surface === 'desktop' ? ['13.10.2026 14:32 CEST', ' · '] : ['13.10.2026 14:32 CEST'],
     )
     await ui.unmount()
   }

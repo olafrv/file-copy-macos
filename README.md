@@ -3,9 +3,9 @@
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
 ```
-📎 Src:        [Paste paths (↵ add)] 📥 Add   📄 Files...  📂 Folder...  📥 Paste  ⬇️ Latest download
+📎 Src:        [Paste paths (↵ add)] 📥 Add   📄 Files  📂 Folder  📥 Paste  🧲 Download
 🎯 Target:     ~/Projects/my-app/docs   ↗️ Open  📌 Finder
-📚 Contents:   🙈 Hide   🗂️ New folder...   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
+📚 Contents:   🙈 Hide   🗂️ New folder   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
 ⤴️ my-app/
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ ☐  │ Name ▲            │ Size    │ Actions                                │
@@ -14,7 +14,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
 └────────────────────────────────────────────────────────────────────────────┘
 1 selected:  ❌ Delete  💬 Ask  📋 Copy
-💡 In Finder:  Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add   Tue 13.10.2026 14:32 CEST · v1.13.4
+💡 In Finder:  Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add   13.10.2026 14:32 CEST · v1.13.4
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -70,20 +70,20 @@ The mod is for macOS only, because it uses these macOS commands:
 | `/bin/mkdir` | 🗂️ New folder |
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
 | `/usr/bin/open` | ↗️ Open and 📌 Finder |
-| `/usr/bin/osascript` | 📄 Files... and 📂 Folder... pickers, 📋 Copy and 📥 Paste (clipboard) |
+| `/usr/bin/osascript` | 📄 Files and 📂 Folder pickers, 📋 Copy and 📥 Paste (clipboard) |
 | `/bin/date` | The time zone of the clock |
 | `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
 
-Listing folders, file sizes, name checks, ⬇️ Latest download and the search outside git use Claude Code's own file access, not commands.
+Listing folders, file sizes, name checks, 🧲 Download and the search outside git use Claude Code's own file access, not commands.
 
 ## What it does
 
 ### Copy files and folders
 
 - **Paste paths** into the field and press Enter (or **📥 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
-- **📄 Files...** and **📂 Folder...** open the macOS picker. You can select several items.
+- **📄 Files** and **📂 Folder** open the macOS picker. You can select several items.
 - **📥 Paste** adds the files and folders you copied in Finder with Cmd+C. Text on the clipboard is ignored.
-- **⬇️ Latest download** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
+- **🧲 Download** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
 - Folders are copied with all their contents.
 
@@ -104,7 +104,7 @@ If a name already exists in the target, the mod asks first:
 - **📚 Contents** is a framed table with the columns tick box, Name, Size and Actions. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
-- **🗂️ New folder...** creates a folder in the target and opens it.
+- **🗂️ New folder** creates a folder in the target and opens it.
 - **Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
 - **🔍 Find** (or Enter) searches the target folder and all folders below it. The table then gets a **Folder** column with each item's folder. Point at a folder there to see its full path; a click opens it. All actions work on the items found, and 📝 Ren keeps an item in its own folder. Typing in the filter again, 🧹 Clear or opening a folder ends the search.
   - In a git project, the search follows `.gitignore`: ignored files are not found. To skip a folder only on your Mac, add it to `.git/info/exclude`.
@@ -128,7 +128,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Clock
 
-The In Finder row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
+The In Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
 
 ### What Claude is told
 

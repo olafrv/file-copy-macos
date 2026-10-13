@@ -201,8 +201,6 @@ export const parseSkipList = (text: string): string[] =>
     .map(name => name.trim().replace(/\/+$/, ''))
     .filter(name => name !== '' && !name.includes('/'))
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
 /**
  * The parts of `date +%z %Z` ("+0200 CEST"): the offset from UTC in minutes
  * and the zone's name; UTC when the text is not that.
@@ -219,14 +217,14 @@ export const parseZone = (text: string): { offset: number; name: string } => {
   return { offset: match[1] === '-' ? -minutes : minutes, name: match[4] ?? 'UTC' }
 }
 
-/** A moment as "Tue 13.10.2026 14:32 CEST", in the zone given. */
+/** A moment as "13.10.2026 14:32 CEST", in the zone given. */
 export const formatClock = (ms: number, offset: number, zone: string): string => {
   const d = new Date(ms + offset * 60_000)
   const two = (n: number) => String(n).padStart(2, '0')
 
   return (
-    `${WEEKDAYS[d.getUTCDay()]} ${two(d.getUTCDate())}.${two(d.getUTCMonth() + 1)}.` +
-    `${d.getUTCFullYear()} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} ${zone}`
+    `${two(d.getUTCDate())}.${two(d.getUTCMonth() + 1)}.${d.getUTCFullYear()} ` +
+    `${two(d.getUTCHours())}:${two(d.getUTCMinutes())} ${zone}`
   )
 }
 

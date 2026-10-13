@@ -69,7 +69,7 @@ const isSearching = atom({ plugin: 'file-copy-macos', key: 'isSearching' } as co
 const sortBy = atom({ plugin: 'file-copy-macos', key: 'sortBy' } as const, 'name')
 const isSortDesc = atom({ plugin: 'file-copy-macos', key: 'isSortDesc' } as const, false)
 // The target folder, relative to the project root ('' is the root itself),
-// and the "New folder..." field: open or not, and what was wrong with a name.
+// and the "New folder" field: open or not, and what was wrong with a name.
 const subdir = atom({ plugin: 'file-copy-macos', key: 'subdir' } as const, '')
 const isNamingFolder = atom({ plugin: 'file-copy-macos', key: 'isNamingFolder' } as const, false)
 const folderError = atom({ plugin: 'file-copy-macos', key: 'folderError' } as const, null)
@@ -200,7 +200,7 @@ const DESKTOP_LABEL_WIDTH = 11
 // The row's label says "In Finder:".
 const FINDER_TIP = 'Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add'
 
-const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use Files... or Folder...'
+const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use 📄 Files or 📂 Folder.'
 
 const shortPath = (path: string): string =>
   path.replace(/^\/Users\/[^/]+/, '~')
@@ -1242,12 +1242,12 @@ export const register: Register = (on, options) => {
           )}
           <Button
             key="pick"
-            label="📄 Files..."
+            label="📄 Files"
             onPress={() => pickAndCopy($, 'files')}
           />
           <Button
             key="pick-folder"
-            label="📂 Folder..."
+            label="📂 Folder"
             onPress={() => pickAndCopy($, 'folders')}
           />
           <Button
@@ -1257,7 +1257,7 @@ export const register: Register = (on, options) => {
           />
           <Button
             key="latest-download"
-            label="⬇️ Latest download"
+            label="🧲 Download"
             onPress={() => copyLatestDownload($)}
           />
         </Box>
@@ -1303,7 +1303,7 @@ export const register: Register = (on, options) => {
               </Box>
             ))}
           </Box>
-          {/* Real buttons, as Files... and Folder... in the row above. */}
+          {/* Real buttons, as Files and Folder in the row above. */}
           <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
           <Button key="finder-target" label="📌 Finder" onPress={() => showInFinder($, '')} />
         </Box>
@@ -1320,7 +1320,7 @@ export const register: Register = (on, options) => {
           {!naming && (
             <Button
               key="new-folder"
-              label="🗂️ New folder..."
+              label="🗂️ New folder"
               plain
               onPress={() => update($, isNamingFolder, () => true)}
             />
