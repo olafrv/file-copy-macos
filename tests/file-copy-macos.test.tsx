@@ -1244,7 +1244,7 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
 test('the In Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
-  const tip = 'Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field -> 📥 Add'
+  const tip = 'Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add'
 
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
   expect(await desktop.find({ type: 'Text', text: '💡 In Finder:' })).toBeDefined()
@@ -1252,7 +1252,7 @@ test('the In Finder row names both ways from Finder; the terminal also names dra
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
-  expect(await terminal.find({ type: 'Text', text: `Drag into Src field -> 📥 Add, ${tip}` })).toBeDefined()
+  expect(await terminal.find({ type: 'Text', text: `Drag into Src > 📥 Add or ${tip}` })).toBeDefined()
   await terminal.unmount()
 })
 
