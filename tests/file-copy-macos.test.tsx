@@ -532,9 +532,7 @@ test('the Contents label and folder rows use emoji on every surface', async ($, 
     expect(await ui.find({ type: 'Text', text: '📋 Contents:' })).toBeDefined()
     await ui.press({ key: 'list' })
     expect((await ui.find({ key: 'dir:docs/' }))?.props.label).toBe('📁 docs/')
-    // No Svg icons; the desktop's GitHub logo is the one Svg.
-    const svg = await ui.find({ type: 'Svg' })
-    expect(svg === undefined || svg.props.alt === 'GitHub').toBe(true)
+    expect(await ui.find({ type: 'Svg' })).toBeUndefined()
     await ui.press({ key: 'list' })
     await ui.unmount()
   }
@@ -603,15 +601,17 @@ test('Contents shows each file size and none for folders', async ($, on) => {
   await ui.unmount()
 })
 
-test('the desktop band has the GitHub logo and a link to the README, the terminal none', async ($, on) => {
+test('the desktop band links the version to the README, the terminal has no link', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
+  on('fs.read', () => ({ value: JSON.stringify({ name: 'file-copy-macos', version: '9.8.7' }) }))
+  on('session.start', () => ({ cwd: '/proj' }))
+  await $.session.start({ cwd: '/proj', surface: 'desktop', isInteractive: true })
 
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
   const link = await desktop.find({ type: 'Link' })
   expect(link?.props.href).toBe('https://github.com/olafrv/file-copy-macos#readme')
-  expect(link?.children).toEqual(['GitHub'])
-  expect((await desktop.find({ type: 'Svg' }))?.props.alt).toBe('GitHub')
+  expect(link?.children).toEqual(['v9.8.7'])
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
@@ -1025,10 +1025,11 @@ test('the clock reads the zone from macOS and shows date, time and zone', async 
   expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('Wed 31.12.2025 21:00 EST')
 })
 
-test('the Shortcuts row shows the clock on both surfaces', async ($, on) => {
+test('the Shortcuts row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('clock.now', () => ({ value: Date.UTC(2026, 9, 13, 12, 32, 15) }))
   on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/date' ? '+0200 CEST\n' : '') }))
+  on('fs.read', () => ({ value: JSON.stringify({ name: 'file-copy-macos', version: '9.8.7' }) }))
 
   on('session.start', () => ({ cwd: '/proj' }))
   await $.session.start({ cwd: '/proj', surface: 'terminal', isInteractive: true })
@@ -1036,8 +1037,9 @@ test('the Shortcuts row shows the clock on both surfaces', async ($, on) => {
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
     expect(await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })).toBeDefined()
-    // On the desktop a middle dot parts the clock from the GitHub link.
-    expect((await ui.find({ type: 'Text', text: '·' })) !== undefined).toBe(surface === 'desktop')
+    // On the desktop a middle dot, then the version as a link.
+    const version = await ui.find({ type: 'Link' })
+    expect(version?.children).toEqual(surface === 'desktop' ? ['v9.8.7'] : undefined)
     await ui.unmount()
   }
 })

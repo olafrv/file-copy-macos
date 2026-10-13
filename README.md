@@ -13,7 +13,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
                │ ☐  │ 📁 2026/          │         │ ↗️ Open  📝 Rename   │
                │ ☐  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open  📝 Rename   │
                └──────────────────────────────────────────────────────────┘
-⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · GitHub
+⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   Tue 13.10.2026 14:32 CEST · v1.6.0
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -96,7 +96,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Clock
 
-The Shortcuts row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, a middle dot, the GitHub logo and a **GitHub** link follow the clock. The link opens this README.
+The Shortcuts row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
 
 ### What Claude is told
 
