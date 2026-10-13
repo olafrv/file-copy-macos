@@ -1163,3 +1163,43 @@ test('Copy puts items on the clipboard, also the ticked ones; Finder selects one
   await ui.press({ key: 'list' })
   await ui.unmount()
 })
+
+test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add', async ($, on) => {
+  const copies: (readonly string[])[] = []
+  let clipboard = '/Users/me/Desktop/My File.pdf\n/Users/me/Desktop/photos\n'
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/usr/bin/osascript' && String(e.argv[4]).includes('public.file-url')) {
+      return { value: ran(clipboard) }
+    }
+
+    if (e.argv[0] === '/bin/sh' && e.argv[5] === 'check') {
+      return { value: ran('') }
+    }
+
+    if (e.argv[0] === '/bin/sh' && e.argv[5] === 'keep') {
+      copies.push(e.argv.slice(6))
+      return { value: ran('OK\t/Users/me/Desktop/My File.pdf\tMy File.pdf\t\n') }
+    }
+
+    return { value: ran('') }
+  })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    copies.length = 0
+    clipboard = '/Users/me/Desktop/My File.pdf\n/Users/me/Desktop/photos\n'
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    expect((await ui.find({ key: 'paste-files' }))?.props.label).toBe('📥 Paste')
+    expect((await ui.find({ key: 'source-0' }))?.props.submitLabel).toBe('📥 Add')
+
+    await ui.press({ key: 'paste-files' })
+    expect(copies).toEqual([['/Users/me/Desktop/My File.pdf', '/Users/me/Desktop/photos']])
+
+    // Text on the clipboard, or nothing: no copy.
+    clipboard = ''
+    await ui.press({ key: 'paste-files' })
+    expect(copies.length).toBe(1)
+    await ui.unmount()
+  }
+})

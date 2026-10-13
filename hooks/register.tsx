@@ -572,6 +572,32 @@ const CLIPBOARD_SCRIPT = `function run(argv) {
   return String(count)
 }`
 
+// Prints the path of each file or folder on the clipboard, one per line: what
+// Cmd+C in Finder put there. Text on the clipboard gives nothing.
+const PASTE_SCRIPT = `function run() {
+  ObjC.import('AppKit')
+  const items = $.NSPasteboard.generalPasteboard.pasteboardItems
+  const paths = []
+  for (let i = 0; i < items.count; i++) {
+    const url = ObjC.unwrap(items.objectAtIndex(i).stringForType('public.file-url'))
+    if (url) paths.push(ObjC.unwrap($.NSURL.URLWithString(url).path))
+  }
+  return paths.join('\\n')
+}`
+
+const pasteFromClipboard = async ($: EngineInterface) => {
+  const { stdout } = await $.process.run(['/usr/bin/osascript', '-l', 'JavaScript', '-e', PASTE_SCRIPT])
+  const paths = stdout.split('\n').filter(path => path.startsWith('/'))
+
+  if (paths.length === 0) {
+    $.ui.toast('No files on the clipboard. Select files in Finder and press Cmd+C first.')
+    return
+  }
+
+  await update($, hint, () => null)
+  await copyIntoProject($, paths)
+}
+
 const pathsOf = async ($: EngineInterface, names: readonly string[]) => {
   const dir = await targetDir($)
 
@@ -938,7 +964,7 @@ export const register: Register = on => {
               key={`source-${await read($, fieldId)}`}
               value={startText === '' ? undefined : startText}
               placeholder={isBusy ? 'Copying...' : 'Paste paths -> Enter'}
-              submitLabel="📥 Copy"
+              submitLabel="📥 Add"
               onInput={async (value: string) => {
                 await update($, draft, () => value)
                 await checkPastedDirs($, value)
@@ -989,6 +1015,11 @@ export const register: Register = on => {
             key="pick-folder"
             label="📂 Folder..."
             onPress={() => pickAndCopy($, 'folders')}
+          />
+          <Button
+            key="paste-files"
+            label="📥 Paste"
+            onPress={() => pasteFromClipboard($)}
           />
           <Button
             key="latest-download"

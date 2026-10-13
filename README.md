@@ -3,7 +3,7 @@
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
 ```
-📎 Source(s):  [Paste paths -> Enter]  📄 Files...  📂 Folder...  ⬇️ Latest download
+📎 Source(s):  [Paste paths -> Enter] 📥 Add   📄 Files...  📂 Folder...  📥 Paste  ⬇️ Latest download
 🎯 Target:     ~/Projects/my-app/docs   ↗️ Open  📌 Finder
 🗂️ Contents:   🙈 Hide   ❇️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
                ⤴️ my-app/
@@ -65,8 +65,9 @@ claude plugin uninstall file-copy-macos
 
 ### Copy files and folders
 
-- **Paste paths** into the field and press Enter. In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
+- **Paste paths** into the field and press Enter (or **📥 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
 - **📄 Files...** and **📂 Folder...** open the macOS picker. You can select several items.
+- **📥 Paste** adds the files and folders you copied in Finder with Cmd+C. Text on the clipboard is ignored.
 - **⬇️ Latest download** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
 - Folders are copied with all their contents.
