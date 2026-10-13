@@ -10,7 +10,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
                   Name               Size      Actions
                ☐  📁 2026/                     ↗️ Open  📝 Rename
                ☐  📄 report.pdf      13 KB     ↗️ Open  📝 Rename
-⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   file-copy-macos v1.2.0
+⌨ Shortcuts:  Option+Cmd+C in Finder copies paths   file-copy-macos v1.3.0
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
