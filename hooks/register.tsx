@@ -1216,11 +1216,14 @@ export const register: Register = on => {
                 : 'Option+Cmd+C in Finder copies paths'}
             </Text>
           </Box>
-          {clock !== null && <Text dimColor>{clock}</Text>}
-          {e.surface === 'desktop' && (
+          {/* One Text, so the row's gap does not widen the space before the dot. */}
+          {(clock !== null || e.surface === 'desktop') && (
             <Text dimColor>
-              {clock !== null && '· '}
-              <Link href={HELP_URL}>{modVersion === null ? 'Help' : `v${modVersion}`}</Link>
+              {clock ?? ''}
+              {e.surface === 'desktop' && clock !== null && ' · '}
+              {e.surface === 'desktop' && (
+                <Link href={HELP_URL}>{modVersion === null ? 'Help' : `v${modVersion}`}</Link>
+              )}
             </Text>
           )}
         </Box>

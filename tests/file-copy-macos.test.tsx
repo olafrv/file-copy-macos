@@ -1037,9 +1037,15 @@ test('the Shortcuts row shows the clock on both surfaces, the version on the des
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
     expect(await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })).toBeDefined()
-    // On the desktop a middle dot, then the version as a link.
+    // On the desktop a middle dot, then the version as a link, all in the
+    // clock's own Text, so no gap of the row widens the space before the dot.
     const version = await ui.find({ type: 'Link' })
     expect(version?.children).toEqual(surface === 'desktop' ? ['v9.8.7'] : undefined)
+    const clock = await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })
+    const parts = (clock?.children ?? []).filter(c => typeof c === 'string')
+    expect(parts).toEqual(
+      surface === 'desktop' ? ['Tue 13.10.2026 14:32 CEST', ' · '] : ['Tue 13.10.2026 14:32 CEST'],
+    )
     await ui.unmount()
   }
 })
