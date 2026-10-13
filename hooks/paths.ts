@@ -136,7 +136,25 @@ const byName = (a: string, b: string): number =>
   a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
 
 /**
- * The entries to show: those whose name holds the filter text (case
+ * An entry's own name and its folder. An entry is a name in the target
+ * ("a.pdf", "docs/") or, in a search, a path below it ("docs/2026/a.pdf",
+ * "docs/old/"); a folder's ends in "/". The folder is "" for the target itself.
+ */
+export const entryName = (entry: string): string => {
+  const bare = entry.replace(/\/$/, '')
+
+  return bare.slice(bare.lastIndexOf('/') + 1) + (entry.endsWith('/') ? '/' : '')
+}
+
+export const entryFolder = (entry: string): string => {
+  const bare = entry.replace(/\/$/, '')
+  const cut = bare.lastIndexOf('/')
+
+  return cut < 0 ? '' : bare.slice(0, cut)
+}
+
+/**
+ * The entries to show: those whose own name holds the filter text (case
  * ignored), folders first, each group in the chosen order. Folders have no
  * size, so by size they keep the name order.
  */
@@ -148,21 +166,40 @@ export const viewEntries = (
   isDesc: boolean,
 ): string[] => {
   const query = text.trim().toLowerCase()
-  const shown = names.filter(n => n.replace(/\/$/, '').toLowerCase().includes(query))
+  const shown = names.filter(n => entryName(n).replace(/\/$/, '').toLowerCase().includes(query))
   const sign = isDesc ? -1 : 1
+  // By name, then by folder; by folder, then by name.
+  const byEntry = (a: string, b: string) =>
+    by === 'folder'
+      ? byName(entryFolder(a), entryFolder(b)) || byName(entryName(a), entryName(b))
+      : byName(entryName(a), entryName(b)) || byName(entryFolder(a), entryFolder(b))
   const folders = shown
     .filter(n => n.endsWith('/'))
-    .sort((a, b) => (by === 'name' ? sign : 1) * byName(a, b))
+    .sort((a, b) => (by === 'size' ? 1 : sign) * byEntry(a, b))
   const files = shown
     .filter(n => !n.endsWith('/'))
     .sort((a, b) =>
       by === 'size'
-        ? sign * ((sizeOf[a] ?? 0) - (sizeOf[b] ?? 0)) || byName(a, b)
-        : sign * byName(a, b),
+        ? sign * ((sizeOf[a] ?? 0) - (sizeOf[b] ?? 0)) || byEntry(a, b)
+        : sign * byEntry(a, b),
     )
 
   return [...folders, ...files]
 }
+
+/** A path cut to `width` characters from the left, so its end stays: "…/2026/q3". */
+export const fitStart = (path: string, width: number): string => {
+  const chars = [...path]
+
+  return chars.length <= width ? path : `…${chars.slice(chars.length - width + 1).join('')}`
+}
+
+/** The folder names of the "skip folders" setting: "a, b c" gives a, b and c. */
+export const parseSkipList = (text: string): string[] =>
+  text
+    .split(/[\s,]+/)
+    .map(name => name.trim().replace(/\/+$/, ''))
+    .filter(name => name !== '' && !name.includes('/'))
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -182,14 +219,13 @@ export const parseZone = (text: string): { offset: number; name: string } => {
   return { offset: match[1] === '-' ? -minutes : minutes, name: match[4] ?? 'UTC' }
 }
 
-/** A moment as "Tue 13.10.2026 14:32:15 CEST", in the zone given. */
+/** A moment as "Tue 13.10.2026 14:32 CEST", in the zone given. */
 export const formatClock = (ms: number, offset: number, zone: string): string => {
   const d = new Date(ms + offset * 60_000)
   const two = (n: number) => String(n).padStart(2, '0')
 
   return (
     `${WEEKDAYS[d.getUTCDay()]} ${two(d.getUTCDate())}.${two(d.getUTCMonth() + 1)}.` +
-    `${d.getUTCFullYear()} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}:` +
-    `${two(d.getUTCSeconds())} ${zone}`
+    `${d.getUTCFullYear()} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} ${zone}`
   )
 }

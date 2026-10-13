@@ -7,9 +7,13 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { CopyResult, Pending, SortKey } from '../types'
 import {
   baseName,
+  entryFolder,
+  entryName,
+  fitStart,
   formatClock,
   humanSize,
   parsePaths,
+  parseSkipList,
   parseZone,
   toFieldText,
   viewEntries,
@@ -17,7 +21,7 @@ import {
 
 // The mod's version, read from its own plugin.json at session start.
 const version = atom({ plugin: 'file-copy-macos', key: 'version' } as const, null)
-// The clock: the second on show (ms since the epoch, 0 before the first
+// The clock: the minute on show (ms since the epoch, 0 before the first
 // tick), and the local zone's offset from UTC in minutes and its name.
 const clockNow = atom({ plugin: 'file-copy-macos', key: 'clockNow' } as const, 0)
 const zoneOffset = atom({ plugin: 'file-copy-macos', key: 'zoneOffset' } as const, 0)
@@ -53,6 +57,13 @@ const page = atom({ plugin: 'file-copy-macos', key: 'page' } as const, 0)
 // The file list's filter text, and the field's id: a new id draws it empty.
 const filter = atom({ plugin: 'file-copy-macos', key: 'filter' } as const, '')
 const filterId = atom({ plugin: 'file-copy-macos', key: 'filterId' } as const, 0)
+// A search in subfolders (Find): the paths found below the target, null while
+// the list shows the target alone; their sizes; a warning when a limit was
+// hit; and whether a search runs.
+const searchHits = atom({ plugin: 'file-copy-macos', key: 'searchHits' } as const, null)
+const searchSizes = atom({ plugin: 'file-copy-macos', key: 'searchSizes' } as const, {})
+const searchNote = atom({ plugin: 'file-copy-macos', key: 'searchNote' } as const, null)
+const isSearching = atom({ plugin: 'file-copy-macos', key: 'isSearching' } as const, false)
 // The file list's order: by name or size, ascending or descending.
 const sortBy = atom({ plugin: 'file-copy-macos', key: 'sortBy' } as const, 'name')
 const isSortDesc = atom({ plugin: 'file-copy-macos', key: 'isSortDesc' } as const, false)
@@ -166,9 +177,16 @@ const sortOn = async ($: EngineInterface, by: SortKey) => {
   await update($, page, () => 0)
 }
 
+const endSearch = async ($: EngineInterface) => {
+  await update($, searchHits, () => null)
+  await update($, searchSizes, () => ({}))
+  await update($, searchNote, () => null)
+}
+
 const clearFilter = async ($: EngineInterface) => {
   await update($, filter, () => '')
   await update($, filterId, id => id + 1)
+  await endSearch($)
 }
 
 // Wide enough for "💡 In Finder:" (an icon is 2 columns), so the rows line up.
@@ -295,16 +313,25 @@ const loadEntries = async ($: EngineInterface) => {
   // Folders first, then files; each group keeps the order ls gave.
   const names = [...all.filter(n => n.endsWith('/')), ...all.filter(n => !n.endsWith('/'))]
 
+  const hits = (await read($, searchHits)) ?? []
+
   await update($, entries, () => names)
-  await update($, selected, list => list.filter(name => names.includes(name)))
+  await update($, selected, list => list.filter(name => names.includes(name) || hits.includes(name)))
   await update($, sizes, () => ({}))
 
+  const bytes = await sizesOf($, dir, names)
+
+  await update($, sizes, () => bytes)
+}
+
+// Each file's size in bytes, by its name or path below `dir`; folders have none.
+const sizesOf = async ($: EngineInterface, dir: string, names: readonly string[]) => {
   const files = names.filter(n => !n.endsWith('/'))
+  const bytes: { [name: string]: number } = {}
 
   if (files.length > 0) {
     // One line per file: size, a tab, the name as given (run inside the folder).
     const stat = await $.process.run(['/usr/bin/stat', '-f', '%z%t%N', ...files], { cwd: dir })
-    const bytes: { [name: string]: number } = {}
 
     for (const line of stat.stdout.split('\n')) {
       const tab = line.indexOf('\t')
@@ -313,9 +340,9 @@ const loadEntries = async ($: EngineInterface) => {
         bytes[line.slice(tab + 1)] = Number(line.slice(0, tab))
       }
     }
-
-    await update($, sizes, () => bytes)
   }
+
+  return bytes
 }
 
 // Moves the named files of the project folder to the macOS Trash, so a delete
@@ -343,6 +370,8 @@ const trashNames = async ($: EngineInterface, root: string, names: string[]) => 
 
       return copied.length > 0 ? { ...result, copied, skipped: [], failed: [] } : null
     })
+
+    await update($, searchHits, hits => (hits === null ? null : hits.filter(h => !removed.includes(h))))
 
     if (removed.length > 0) {
       await tellClaude($, root, removed, true)
@@ -415,16 +444,19 @@ const startRename = async ($: EngineInterface, name: string | null) => {
   await update($, renaming, () => name)
 }
 
-// Renames a file of the target folder. Never overwrites: a name already
-// taken is refused. The new name stays in the same folder (no "/").
-// `entry` is the name as Contents lists it; a folder's ends in "/".
+// Renames a file or folder of the target, or, in a search, below it. Never
+// overwrites: a name already taken is refused. The item stays in its own
+// folder (no "/" in the new name). `entry` is the name or path as Contents
+// lists it; a folder's ends in "/".
 const renameFile = async ($: EngineInterface, entry: string, raw: string) => {
   const isFolder = entry.endsWith('/')
   const kind = isFolder ? 'folder' : 'file'
   const from = entry.replace(/\/$/, '')
+  const parent = entryFolder(entry)
+  const oldName = entryName(entry).replace(/\/$/, '')
   const to = raw.trim()
 
-  if (to === from) {
+  if (to === oldName) {
     await startRename($, null)
     return
   }
@@ -444,32 +476,39 @@ const renameFile = async ($: EngineInterface, entry: string, raw: string) => {
   }
 
   const dir = await targetDir($)
-  const taken = await $.process.run(['/bin/test', '-e', `${dir}/${to}`])
+  const toPath = parent === '' ? to : `${parent}/${to}`
+  const taken = await $.process.run(['/bin/test', '-e', `${dir}/${toPath}`])
 
   if (taken.exitCode === 0) {
     await update($, renameError, () => `"${to}" already exists here.`)
     return
   }
 
-  const moved = await $.process.run(['/bin/mv', '-n', `${dir}/${from}`, `${dir}/${to}`])
+  const moved = await $.process.run(['/bin/mv', '-n', `${dir}/${from}`, `${dir}/${toPath}`])
   // macOS `mv -n` exits 0 even when it skipped the move: check the old name is gone.
   const left = await $.process.run(['/bin/test', '-e', `${dir}/${from}`])
 
   if (moved.exitCode !== 0 || left.exitCode === 0) {
-    await update($, renameError, () => `Could not rename "${from}".`)
+    await update($, renameError, () => `Could not rename "${oldName}".`)
     return
   }
 
+  const newEntry = isFolder ? `${toPath}/` : toPath
+
   await startRename($, null)
-  await update($, selected, list => list.map(n => (n === entry ? (isFolder ? `${to}/` : to) : n)))
+  await update($, selected, list => list.map(n => (n === entry ? newEntry : n)))
+  await update($, searchHits, hits => (hits === null ? null : hits.map(h => (h === entry ? newEntry : h))))
+  await update($, searchSizes, bytes =>
+    bytes[entry] === undefined ? bytes : { ...bytes, [newEntry]: bytes[entry] ?? 0 },
+  )
   await update($, last, result =>
     result === null || result.root !== dir
       ? result
-      : { ...result, copied: result.copied.map(n => (n === from ? to : n)) },
+      : { ...result, copied: result.copied.map(n => (n === from ? toPath : n)) },
   )
-  await tellClaudeRename($, dir, from, to, isFolder)
+  await tellClaudeRename($, dir, from, toPath, isFolder)
   await loadEntries($)
-  $.ui.toast(`Renamed ${from} to ${to}`)
+  $.ui.toast(`Renamed ${oldName} to ${to}`)
 }
 
 const createFolder = async ($: EngineInterface, raw: string) => {
@@ -521,10 +560,15 @@ const toggleList = async ($: EngineInterface) => {
   }
 }
 
-// The filter field is always drawn: typing in it shows the list.
+// The filter field is always drawn: typing in it shows the list. Typing
+// ends a search in subfolders: the filter applies to the target alone.
 const filterBy = async ($: EngineInterface, value: string) => {
   await update($, filter, () => value)
   await update($, page, () => 0)
+
+  if ((await read($, searchHits)) !== null) {
+    await endSearch($)
+  }
 
   if (value.trim() !== '' && !(await read($, isListOpen))) {
     await toggleList($)
@@ -637,6 +681,122 @@ const showInFinder = async ($: EngineInterface, name: string) => {
 
   if (exitCode !== 0) {
     $.ui.toast(`Could not show ${name === '' ? shortPath(path) : name} in Finder`)
+  }
+}
+
+// The most results a search shows, and how long it may run.
+const SEARCH_LIMIT = 500
+const SEARCH_SECONDS = 5
+
+// Folder names a search skips, from the "Search: skip folders" setting.
+let skipFolders: string[] = parseSkipList('.git, .svn, .hg, node_modules, bower_components')
+
+// Prints the files and folders below the current folder whose own name holds
+// $1 (case ignored), one path per line, a folder's ending in "/". In a git
+// project it asks git (tracked and new files, .gitignore applied), otherwise
+// it lists the folders with find, which reads names only, never follows
+// links and stays on this disk. The other arguments are folder names to
+// skip. It stops after one result more than the limit, and after the time
+// limit, then prints "#TIMEOUT". It runs in its own process group, so the
+// time limit stops all of it.
+const SEARCH_SCRIPT = `
+exec 2>/dev/null
+Q=$1; LIMIT=$2; SECONDS_MAX=$3; shift 3
+SKIP=$(printf '%s\\n' "$@"); export Q SKIP
+out=$(/usr/bin/mktemp -t file-copy-search) || exit 2
+n0=$#
+for name in "$@"; do set -- "$@" -o -name "$name"; done
+shift "$n0"
+if [ $# -gt 0 ]; then shift; else set -- -false; fi
+# Its own process group, so the time limit stops every process of the search.
+set -m
+(
+  if /usr/bin/git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    /usr/bin/git ls-files -co --exclude-standard 2>/dev/null |
+      /usr/bin/awk '{ print; p = $0
+        while (match(p, /\\/[^\\/]*$/) > 0) { p = substr(p, 1, RSTART - 1)
+          if (!(p in seen)) { seen[p] = 1; print p "/" } } }'
+  else
+    /usr/bin/find . -xdev \\( "$@" \\) -prune -o -type d -print 2>/dev/null | /usr/bin/sed 's|$|/|'
+    /usr/bin/find . -xdev \\( "$@" \\) -prune -o ! -type d -print 2>/dev/null
+  fi |
+  /usr/bin/awk 'BEGIN { q = tolower(ENVIRON["Q"]); n = split(ENVIRON["SKIP"], s, "\\n")
+      for (i = 1; i <= n; i++) if (s[i] != "") skip[s[i]] = 1 }
+    { sub(/^\\.\\//, ""); if ($0 == "" || $0 == "." || $0 == "./") next
+      p = $0; sub(/\\/$/, "", p); k = split(p, part, "/")
+      for (i = 1; i <= k; i++) if (part[i] in skip) next
+      if (part[k] == ".DS_Store") next
+      if (index(tolower(part[k]), q) > 0) print }' |
+  /usr/bin/head -n $((LIMIT + 1)) > "$out"
+) &
+pid=$!
+ticks=0
+while kill -0 "$pid" 2>/dev/null; do
+  if [ "$ticks" -ge $((SECONDS_MAX * 10)) ]; then
+    kill -TERM -- -"$pid" 2>/dev/null; timedout=1; break
+  fi
+  /bin/sleep 0.1; ticks=$((ticks + 1))
+done
+wait "$pid" 2>/dev/null
+/bin/cat "$out"; /bin/rm -f "$out"
+if [ -n "$timedout" ]; then echo "#TIMEOUT"; fi
+`
+
+// Find: searches the target and every folder below it for names that hold
+// the text; an empty text shows the target alone again.
+const runSearch = async ($: EngineInterface, text: string) => {
+  const query = text.trim()
+
+  await update($, filter, () => text)
+  await update($, page, () => 0)
+
+  if (query === '') {
+    await endSearch($)
+    return
+  }
+
+  if (!(await read($, isListOpen))) {
+    await toggleList($)
+  }
+
+  await update($, isSearching, () => true)
+
+  try {
+    const dir = await targetDir($)
+    const { stdout } = await $.process.run(
+      [
+        '/bin/sh',
+        '-c',
+        SEARCH_SCRIPT,
+        'file-copy-macos',
+        query,
+        String(SEARCH_LIMIT),
+        String(SEARCH_SECONDS),
+        ...skipFolders,
+      ],
+      { cwd: dir, timeoutMs: (SEARCH_SECONDS + 10) * 1000 },
+    )
+    const lines = stdout.split('\n').filter(line => line !== '')
+    const isTimedOut = lines.includes('#TIMEOUT')
+    const found = lines.filter(line => line !== '#TIMEOUT')
+    const hits = found.slice(0, SEARCH_LIMIT)
+    const note =
+      found.length > SEARCH_LIMIT
+        ? `More than ${SEARCH_LIMIT} results: showing the first ${SEARCH_LIMIT}. Use a longer search text.`
+        : isTimedOut
+          ? `The search stopped after ${SEARCH_SECONDS} seconds: the results may be incomplete.`
+          : null
+
+    await update($, searchHits, () => hits)
+    await update($, searchNote, () => note)
+    await update($, searchSizes, () => ({}))
+    const bytes = await sizesOf($, dir, hits)
+    await update($, searchSizes, () => bytes)
+  } catch {
+    await update($, searchHits, () => [])
+    await update($, searchNote, () => 'The search failed.')
+  } finally {
+    await update($, isSearching, () => false)
   }
 }
 
@@ -853,33 +1013,37 @@ const loadZone = async ($: EngineInterface) => {
   await update($, zoneName, () => zone.name)
 }
 
-const SECOND = 1000
+const MINUTE = 60_000
 const HOUR = 3_600_000
 
-// Stores the time once a second, on the second, so the band redraws the
-// clock; the zone is asked again each hour, for the change of summer time.
+// Stores the time once a minute, on the minute, so the band redraws the
+// clock only then; the zone is asked again each hour, for summer time.
 const startClock = async ($: EngineInterface) => {
   const tick = async () => {
     const now = await $.clock.now()
 
-    if (now % HOUR < SECOND) {
+    if (now % HOUR < MINUTE) {
       await loadZone($)
     }
 
-    await update($, clockNow, () => now - (now % SECOND))
+    await update($, clockNow, () => now - (now % MINUTE))
   }
 
   await loadZone($)
   await tick()
   const now = await $.clock.now()
 
-  $.clock.after(SECOND - (now % SECOND), () => {
+  $.clock.after(MINUTE - (now % MINUTE), () => {
     void tick()
-    $.clock.every(SECOND, () => void tick())
+    $.clock.every(MINUTE, () => void tick())
   })
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  if (typeof options.searchSkip === 'string') {
+    skipFolders = parseSkipList(options.searchSkip)
+  }
+
   // A result from an earlier session says nothing about the folder now.
   on('session.start', async ($, e, next) => {
     await update($, version, () => null)
@@ -887,6 +1051,8 @@ export const register: Register = on => {
     await startClock($)
     await update($, last, () => null)
     await update($, subdir, () => '')
+    await endSearch($)
+    await update($, isSearching, () => false)
 
     return next(e)
   })
@@ -906,11 +1072,11 @@ export const register: Register = on => {
     const root = await $.session.root()
     const dir = await read($, subdir)
     const modVersion = await read($, version)
-    const shownSecond = await read($, clockNow)
+    const shownMinute = await read($, clockNow)
     const clock =
-      shownSecond === 0
+      shownMinute === 0
         ? null
-        : formatClock(shownSecond, await read($, zoneOffset), await read($, zoneName))
+        : formatClock(shownMinute, await read($, zoneOffset), await read($, zoneName))
     const target = dir === '' ? root : `${root}/${dir}`
     const naming = await read($, isNamingFolder)
     const editing = await read($, renaming)
@@ -921,14 +1087,20 @@ export const register: Register = on => {
     const hidden = await read($, isHidden)
     const ask = await read($, pending)
     const listOpen = await read($, isListOpen)
-    const names = listOpen ? await read($, entries) : []
+    // During a search the list shows the paths found below the target.
+    const hits = listOpen ? await read($, searchHits) : null
+    const showFolder = hits !== null
+    const searching = await read($, isSearching)
+    const note = listOpen ? await read($, searchNote) : null
+    const names = listOpen ? (hits ?? (await read($, entries))) : []
     const ticked = listOpen ? await read($, selected) : []
-    const sizeOf = listOpen ? await read($, sizes) : {}
+    const sizeOf = !listOpen ? {} : showFolder ? await read($, searchSizes) : await read($, sizes)
     const confirming = listOpen && ticked.length > 0 && (await read($, isConfirming))
     const filterText = await read($, filter)
     const by = await read($, sortBy)
     const desc = await read($, isSortDesc)
-    const view = viewEntries(names, sizeOf, filterText, by, desc)
+    // The search already matched the names; the live filter is for the target alone.
+    const view = viewEntries(names, sizeOf, showFolder ? '' : filterText, by, desc)
     const arrow = (key: SortKey) => (by === key ? (desc ? ' ▼' : ' ▲') : '')
     // A page past the end (after a delete) shows the last page.
     const pageCount = Math.max(1, Math.ceil(view.length / PAGE_SIZE))
@@ -940,8 +1112,6 @@ export const register: Register = on => {
     // Each column has a cell of padding on both sides (on the desktop, not the
     // tick box), the frame 2 sides, and in the terminal 3 "│" between them.
     const tickWidth = lines ? TICK_WIDTH : DESKTOP_TICK_WIDTH
-    const frame = tickWidth + SIZE_WIDTH + ACTIONS_WIDTH + (lines ? 13 : 8)
-    // The Name column takes what the label, its gap and the other columns leave.
     const labelWidth = lines ? LABEL_WIDTH : DESKTOP_LABEL_WIDTH
     // The desktop's buttons have a frame: buttons in rows one above the other
     // touched. A part of a row keeps them apart; the terminal needs none.
@@ -949,8 +1119,15 @@ export const register: Register = on => {
     // The desktop draws "☐" from a text font, narrow and cut at the left;
     // color emoji fill their square there.
     const tick = (isOn: boolean) => (lines ? (isOn ? '☑' : '☐') : isOn ? '✅' : '⬜')
-    const nameWidth = Math.max(MIN_NAME_WIDTH, e.props.bodyColumns - labelWidth - 1 - frame)
-    const tableWidth = nameWidth + frame
+    // The Folder column, during a search, adds its padding and a "│".
+    const frame =
+      tickWidth + SIZE_WIDTH + ACTIONS_WIDTH + (lines ? 13 : 8) + (showFolder ? (lines ? 3 : 2) : 0)
+    // The table takes the whole width of the band; Name and Folder share what
+    // the other columns leave, Folder 40 percent of it.
+    const textWidth = Math.max(MIN_NAME_WIDTH, e.props.bodyColumns - frame)
+    const folderWidth = showFolder ? Math.floor(textWidth * 0.4) : 0
+    const nameWidth = textWidth - folderWidth
+    const tableWidth = textWidth + frame
     const showResult = result !== null && !hidden && !isBusy && ask === null
     // The Hide button sits on the last result line drawn.
     const hideOn =
@@ -977,7 +1154,7 @@ export const register: Register = on => {
             <Input
               key={`source-${await read($, fieldId)}`}
               value={startText === '' ? undefined : startText}
-              placeholder={isBusy ? 'Copying...' : 'Paste paths -> Enter'}
+              placeholder={isBusy ? 'Copying...' : 'Paste paths (↵ add)'}
               submitLabel="📥 Add"
               onInput={async (value: string) => {
                 await update($, draft, () => value)
@@ -1095,10 +1272,10 @@ export const register: Register = on => {
             <Input
               key={`filter-${await read($, filterId)}`}
               label="Filter"
-              placeholder="Name"
+              placeholder="Name (↵ recursive)"
               submitLabel="🔍 Find"
               onInput={(value: string) => filterBy($, value)}
-              onSubmit={(value: string) => filterBy($, value)}
+              onSubmit={(value: string) => runSearch($, value)}
             />
           </Box>
           {filterText !== '' && (
@@ -1158,7 +1335,6 @@ export const register: Register = on => {
         )}
         {listOpen && (
           <Box flexDirection="row" gap={1}>
-            <Box width={labelWidth} />
             <Box flexDirection="column" flexGrow={1}>
               {dir !== '' && (
                 <Button
@@ -1168,7 +1344,13 @@ export const register: Register = on => {
                   onPress={() => openFolder($, parentOf(dir))}
                 />
               )}
-              {names.length === 0 && <Text dimColor>The folder is empty.</Text>}
+              {names.length === 0 && !searching && (
+                <Text dimColor>
+                  {showFolder
+                    ? `Nothing found for "${filterText.trim()}" in this folder and below.`
+                    : 'The folder is empty.'}
+                </Text>
+              )}
               {names.length > 0 && view.length === 0 && (
                 <Text dimColor>{`No name contains "${filterText.trim()}".`}</Text>
               )}
@@ -1199,6 +1381,18 @@ export const register: Register = on => {
                         onPress={() => sortOn($, 'name')}
                       />
                     </Box>
+                    {showFolder && lines && <Text dimColor>│</Text>}
+                    {showFolder && (
+                      <Box width={folderWidth + 2} paddingX={1}>
+                        <Button
+                          key="sort-folder"
+                          label={`Folder${arrow('folder')}`}
+                          plain
+                          dimColor
+                          onPress={() => sortOn($, 'folder')}
+                        />
+                      </Box>
+                    )}
                     {lines && <Text dimColor>│</Text>}
                     <Box width={SIZE_WIDTH + 2} paddingX={1}>
                       <Button
@@ -1216,7 +1410,7 @@ export const register: Register = on => {
                   </Box>
                   {lines && (
                     <Text key="table-line" dimColor>
-                      {[tickWidth, nameWidth, SIZE_WIDTH, ACTIONS_WIDTH]
+                      {[tickWidth, nameWidth, ...(showFolder ? [folderWidth] : []), SIZE_WIDTH, ACTIONS_WIDTH]
                         .map(width => '─'.repeat(width + 2))
                         .join('┼')}
                     </Text>
@@ -1229,7 +1423,7 @@ export const register: Register = on => {
                             <Input
                               key={`rename-field:${name}`}
                               label="📝 Rename to"
-                              value={name.replace(/\/$/, '')}
+                              value={entryName(name).replace(/\/$/, '')}
                               submitLabel="📝 Rename"
                               autoFocus
                               onInput={() =>
@@ -1262,7 +1456,7 @@ export const register: Register = on => {
                           {name.endsWith('/') ? (
                             <Button
                               key={`dir:${name}`}
-                              label={fitName(`📁 ${name}`, nameWidth)}
+                              label={fitName(`📁 ${entryName(name)}`, nameWidth)}
                               plain
                               onPress={() =>
                                 openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`)
@@ -1271,12 +1465,43 @@ export const register: Register = on => {
                           ) : (
                             <Button
                               key={`file:${name}`}
-                              label={fitName(`📄 ${name}`, nameWidth)}
+                              label={fitName(`📄 ${entryName(name)}`, nameWidth)}
                               plain
                               onPress={() => openWithDefaultApp($, name)}
                             />
                           )}
                         </Box>
+                        {showFolder && lines && <Text dimColor>│</Text>}
+                        {showFolder && (
+                          // A keyed Box is a hover scope: the pointer over the cell
+                          // reveals the full folder above it, over the row before,
+                          // without moving anything.
+                          <Box key={`folder-cell:${name}`} width={folderWidth + 2} paddingX={1}>
+                            <Button
+                              key={`folder:${name}`}
+                              label={fitStart(entryFolder(name) === '' ? '.' : entryFolder(name), folderWidth)}
+                              plain
+                              dimColor
+                              onPress={() =>
+                                openFolder(
+                                  $,
+                                  [dir, entryFolder(name)].filter(part => part !== '').join('/'),
+                                )
+                              }
+                            />
+                            <Box
+                              position="absolute"
+                              top={-1}
+                              left={1}
+                              display="none"
+                              hover={{ display: 'flex' }}
+                            >
+                              <Text inverse>
+                                {` ${shortPath([target, entryFolder(name)].filter(p => p !== '').join('/'))} `}
+                              </Text>
+                            </Box>
+                          </Box>
+                        )}
                         {lines && <Text dimColor>│</Text>}
                         <Box width={SIZE_WIDTH + 2} paddingX={1}>
                           {sizeOf[name] !== undefined && (
@@ -1333,6 +1558,8 @@ export const register: Register = on => {
                   )}
                 </Box>
               )}
+              {searching && <Text dimColor>Searching...</Text>}
+              {note !== null && <Text color="yellow">{`⚠ ${note}`}</Text>}
               {ticked.length > 0 && !confirming && (
                 <Box flexDirection="row" gap={1} alignItems="center">
                   <Text dimColor>{`${ticked.length} selected:`}</Text>

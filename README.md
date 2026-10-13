@@ -3,18 +3,18 @@
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
 ```
-📎 Src:        [Paste paths -> Enter] 📥 Add   📄 Files...  📂 Folder...  📥 Paste  ⬇️ Latest download
+📎 Src:        [Paste paths (↵ add)] 📥 Add   📄 Files...  📂 Folder...  📥 Paste  ⬇️ Latest download
 🎯 Target:     ~/Projects/my-app/docs   ↗️ Open  📌 Finder
-📚 Contents:   🙈 Hide   🗂️ New folder...   Filter: [Name] 🔍 Find   ◀ 2/3 (#9) ▶
-               ⤴️ my-app/
-               ┌────────────────────────────────────────────────────────────────────────────┐
-               │ ☐  │ Name ▲            │ Size    │ Actions                                │
-               │────┼───────────────────┼─────────┼────────────────────────────────────────│
-               │ ☐  │ 📁 2026/          │         │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
-               │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
-               └────────────────────────────────────────────────────────────────────────────┘
-               1 selected:  ❌ Delete  💬 Ask  📋 Copy
-💡 In Finder:  Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field   Tue 13.10.2026 14:32:15 CEST · v1.11.1
+📚 Contents:   🙈 Hide   🗂️ New folder...   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
+⤴️ my-app/
+┌────────────────────────────────────────────────────────────────────────────┐
+│ ☐  │ Name ▲            │ Size    │ Actions                                │
+│────┼───────────────────┼─────────┼────────────────────────────────────────│
+│ ☐  │ 📁 2026/          │         │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
+│ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
+└────────────────────────────────────────────────────────────────────────────┘
+1 selected:  ❌ Delete  💬 Ask  📋 Copy
+💡 In Finder:  Cmd+C -> 📥 Paste, Opt+Cmd+C -> Cmd+V in Src field   Tue 13.10.2026 14:32 CEST · v1.11.1
 ✅ Copied:     report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -90,7 +90,12 @@ If a name already exists in the target, the mod asks first:
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - **🗂️ New folder...** creates a folder in the target and opens it.
-- **Filter:** is always shown. It shows only items whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
+- **Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
+- **🔍 Find** (or Enter) searches the target folder and all folders below it. The table then gets a **Folder** column with each item's folder. Point at a folder there to see its full path; a click opens it. All actions work on the items found, and 📝 Ren keeps an item in its own folder. Typing in the filter again, 🧹 Clear or opening a folder ends the search.
+  - In a git project, the search follows `.gitignore`: ignored files are not found. To skip a folder only on your Mac, add it to `.git/info/exclude`.
+  - The setting **Search: skip folders** (in `/config`) lists folder names the search always skips. The default is `.git, .svn, .hg, node_modules, bower_components`. Add others, for example `.venv` or `dist`.
+  - The search shows at most 500 results and stops after 5 seconds. If it hits a limit, a yellow warning says so.
+  - Skipped and ignored items are still in the table when you open their folder.
 - Click **Name** or **Size** in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
 - The list shows 4 items per page. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
 - Each row has five actions:
@@ -108,7 +113,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Clock
 
-The In Finder row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32:15 CEST`. It changes every second. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
+The In Finder row shows the local date, time and time zone, for example `Tue 13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
 
 ### What Claude is told
 
@@ -131,6 +136,7 @@ The note does not start a turn. Claude reads it with your next message and does 
 - **No drag and drop.** The mod API has no drag events, in either direction. To bring files in, use paste (Option+Cmd+C) or the pickers. To take files out, use **📋 Copy** or **📌 Finder**.
 - **Buttons use the app's own style.** A mod cannot change their color or font size.
 - **Folder sizes are not shown.** Reading every file in a big folder would be slow.
+- **The search finds names, not file contents.** It does not look inside files.
 
 ## Development
 

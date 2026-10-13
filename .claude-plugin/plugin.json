@@ -13,5 +13,13 @@
     "macos",
     "mod"
   ],
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "searchSkip": {
+      "type": "string",
+      "title": "Search: skip folders",
+      "description": "Folder names that Find skips when it searches subfolders, separated by commas, for example: .venv, dist. In a git project, files in .gitignore are skipped as well.",
+      "default": ".git, .svn, .hg, node_modules, bower_components"
+    }
+  }
 }

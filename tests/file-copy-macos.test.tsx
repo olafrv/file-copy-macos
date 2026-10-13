@@ -865,11 +865,11 @@ test('Contents is a table: header, tick, name, size and actions per row', async 
     // A name too long for its column ends in "…" and fits it.
     const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
     expect(label.endsWith('…')).toBe(true)
-    // 100 columns less the label and its gap (1), then in the terminal label
-    // (13), tick (2), size (9), actions (39), padding and frame (10) and 3
-    // column lines leave 23 for the name; on the desktop label (11), tick (5,
-    // no padding), size, actions, padding and frame (8) leave 27.
-    const nameWidth = surface === 'terminal' ? 23 : 27
+    // The table takes the whole width (100). In the terminal tick (2), size
+    // (9), actions (39), padding and frame (10) and 3 column lines leave 37
+    // for the name; on the desktop tick (5, no padding), size, actions,
+    // padding and frame (8) leave 39.
+    const nameWidth = surface === 'terminal' ? 37 : 39
     expect([...label].length + 1).toBe(nameWidth)
 
     // A frame on both; column lines and a header line in the terminal only,
@@ -1024,11 +1024,11 @@ test('the clock reads the zone from macOS and shows date, time and zone', async 
   expect(parseZone('-0330 NST')).toEqual({ offset: -210, name: 'NST' })
   expect(parseZone('')).toEqual({ offset: 0, name: 'UTC' })
 
-  // 12:32:15 UTC is 14:32:15 in CEST.
-  expect(formatClock(Date.UTC(2026, 9, 13, 12, 32, 15), 120, 'CEST')).toBe('Tue 13.10.2026 14:32:15 CEST')
+  // 12:32:15 UTC is 14:32 in CEST; seconds are not shown.
+  expect(formatClock(Date.UTC(2026, 9, 13, 12, 32, 15), 120, 'CEST')).toBe('Tue 13.10.2026 14:32 CEST')
   // Late UTC evening is already the next day east of UTC, and the day before west of it.
-  expect(formatClock(Date.UTC(2025, 11, 31, 23, 30), 60, 'CET')).toBe('Thu 01.01.2026 00:30:00 CET')
-  expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('Wed 31.12.2025 21:00:00 EST')
+  expect(formatClock(Date.UTC(2025, 11, 31, 23, 30), 60, 'CET')).toBe('Thu 01.01.2026 00:30 CET')
+  expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('Wed 31.12.2025 21:00 EST')
 })
 
 test('the In Finder row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
@@ -1042,15 +1042,15 @@ test('the In Finder row shows the clock on both surfaces, the version on the des
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32:15 CEST' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })).toBeDefined()
     // On the desktop a middle dot, then the version as a link, all in the
     // clock's own Text, so no gap of the row widens the space before the dot.
     const version = await ui.find({ type: 'Link' })
     expect(version?.children).toEqual(surface === 'desktop' ? ['v9.8.7'] : undefined)
-    const clock = await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32:15 CEST' })
+    const clock = await ui.find({ type: 'Text', text: 'Tue 13.10.2026 14:32 CEST' })
     const parts = (clock?.children ?? []).filter(c => typeof c === 'string')
     expect(parts).toEqual(
-      surface === 'desktop' ? ['Tue 13.10.2026 14:32:15 CEST', ' · '] : ['Tue 13.10.2026 14:32:15 CEST'],
+      surface === 'desktop' ? ['Tue 13.10.2026 14:32 CEST', ' · '] : ['Tue 13.10.2026 14:32 CEST'],
     )
     await ui.unmount()
   }
@@ -1221,4 +1221,110 @@ test('the In Finder row names both ways from Finder; the terminal also names dra
   const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
   expect(await terminal.find({ type: 'Text', text: `Drag into Src field, ${tip}` })).toBeDefined()
   await terminal.unmount()
+})
+
+test('Find searches subfolders: Folder column, warnings, rename in place', { options: { searchSkip: '.venv, dist/' } }, async ($, on) => {
+  const searches: (readonly string[])[] = []
+  const moves: (readonly string[])[] = []
+  const fills: string[] = []
+  let found = 'docs/2026/report.pdf\ndocs/old/\narchive/x/report-old.pdf\n'
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    const [cmd] = e.argv
+
+    if (cmd === '/bin/sh' && String(e.argv[2]).includes('git ls-files')) {
+      searches.push(e.argv.slice(4))
+      return { value: ran(found) }
+    }
+
+    if (cmd === '/bin/ls') {
+      return { value: ran(e.argv[2] === '/proj' ? 'docs/\narchive/\n' : 'report.pdf\n') }
+    }
+
+    if (cmd === '/usr/bin/stat') {
+      return { value: ran('13000\tdocs/2026/report.pdf\n9000\tarchive/x/report-old.pdf\n') }
+    }
+
+    if (cmd === '/bin/test') {
+      return { value: { ...ran(''), exitCode: 1 } }
+    }
+
+    if (cmd === '/bin/mv') {
+      moves.push(e.argv)
+    }
+
+    return { value: ran('') }
+  })
+  on('prompt.fill', ($, e) => {
+    fills.push(e.text)
+    return { isFilled: true, text: e.text, cursor: e.text.length }
+  })
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
+
+  // Find (Enter) opens the list and searches with the text, the limits and
+  // the folders of the setting.
+  await ui.input({ key: 'filter-0', text: 'report' })
+  expect(searches[0]).toEqual(['report', '500', '5', '.venv', 'dist'])
+  expect(await ui.find({ key: 'sort-folder' })).toBeDefined()
+  expect((await ui.find({ key: 'file:docs/2026/report.pdf' }))?.props.label).toBe('📄 report.pdf')
+  expect((await ui.find({ key: 'folder:docs/2026/report.pdf' }))?.props.label).toBe('docs/2026')
+  // The full folder, revealed while the pointer is over the cell.
+  const tip = await ui.find({ type: 'Text', text: ' /proj/docs/2026 ' })
+  expect(tip?.props.inverse).toBe(true)
+  expect((await ui.find({ key: 'dir:docs/old/' }))?.props.label).toBe('📁 old/')
+  expect(await ui.find({ type: 'Text', text: '13 KB' })).toBeDefined()
+
+  // Ask writes the path from the project.
+  await ui.press({ key: 'mention:docs/2026/report.pdf' })
+  expect(fills).toEqual(['@docs/2026/report.pdf '])
+
+  // Rename keeps the item in its own folder.
+  await ui.press({ key: 'rename:docs/2026/report.pdf' })
+  expect((await ui.find({ key: 'rename-field:docs/2026/report.pdf' }))?.props.value).toBe('report.pdf')
+  await ui.input({ key: 'rename-field:docs/2026/report.pdf', text: 'final.pdf' })
+  expect(moves).toEqual([['/bin/mv', '-n', '/proj/docs/2026/report.pdf', '/proj/docs/2026/final.pdf']])
+  expect((await ui.find({ key: 'file:docs/2026/final.pdf' }))?.props.label).toBe('📄 final.pdf')
+
+  // Typing ends the search: the list shows the target again.
+  await ui.input({ key: 'filter-0', text: 'doc', kind: 'change' })
+  expect(await ui.find({ key: 'sort-folder' })).toBeUndefined()
+  expect(await ui.find({ key: 'dir:docs/' })).toBeDefined()
+
+  // More than 500 results: the first 500 and a warning.
+  found = Array.from({ length: 501 }, (_, i) => `a/f${i}.txt`).join('\n')
+  await ui.input({ key: 'filter-0', text: 'f' })
+  expect(await ui.find({ type: 'Text', text: '1/125 (#500)' })).toBeDefined()
+  expect(
+    await ui.find({
+      type: 'Text',
+      text: '⚠ More than 500 results: showing the first 500. Use a longer search text.',
+    }),
+  ).toBeDefined()
+
+  // The time limit: what was found, and a warning.
+  found = 'a/f1.txt\n#TIMEOUT\n'
+  await ui.input({ key: 'filter-0', text: 'f1' })
+  expect(await ui.find({ key: 'file:a/f1.txt' })).toBeDefined()
+  expect(
+    await ui.find({
+      type: 'Text',
+      text: '⚠ The search stopped after 5 seconds: the results may be incomplete.',
+    }),
+  ).toBeDefined()
+
+  // Nothing found.
+  found = ''
+  await ui.input({ key: 'filter-0', text: 'zzz' })
+  expect(await ui.find({ type: 'Text', text: 'Nothing found for "zzz" in this folder and below.' })).toBeDefined()
+
+  // A click on a folder in the Folder column opens it, and ends the search.
+  found = 'archive/x/report-old.pdf\n'
+  await ui.input({ key: 'filter-0', text: 'old' })
+  await ui.press({ key: 'folder:archive/x/report-old.pdf' })
+  expect(await ui.find({ key: 'sort-folder' })).toBeUndefined()
+  expect(await ui.find({ key: 'up' })).toBeDefined()
+
+  await ui.unmount()
 })
