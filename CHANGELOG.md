@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.0
+
+- New help tips: point at a button to see what it does. Turn them on with **💤 Tips** in the 💡 Finder row (it becomes **✅ Tips**). They are off by default, because the app shows them at once, without a delay. The mod remembers your choice.
+- The 💡 Finder tip is shorter, with the Mac key symbols: "⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add". With tips on, pointing at it explains it in words.
+- The clock and the version stay on one line. Only the tip wraps in a narrow window.
+
 ## 1.13.6
 
 - Shorter labels: "📚 Contents:" is now "📚 Content:", and "💡 In Finder:" is now "💡 Finder:".
