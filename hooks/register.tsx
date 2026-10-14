@@ -10,6 +10,7 @@ import {
   entryFolder,
   entryName,
   fitCrumbs,
+  pageSizeFor,
   fitStart,
   formatClock,
   humanSize,
@@ -161,9 +162,6 @@ const pickScript = (kind: PickKind): string[] => [
 
 // Where the version links to: the README on GitHub. On the desktop only.
 const HELP_URL = 'https://github.com/olafrv/file-copy-macos#readme'
-
-// Entries per page of the file list.
-const PAGE_SIZE = 4
 
 // The file list's columns, in terminal cells: the tick box, the size
 // ("999 KB"), the actions ("↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy") and the least
@@ -1166,10 +1164,36 @@ export const register: Register = (on, options) => {
     // The search already matched the names; the live filter is for the target alone.
     const view = viewEntries(names, sizeOf, showFolder ? '' : filterText, by, desc)
     const arrow = (key: SortKey) => (by === key ? (desc ? ' ▼' : ' ▲') : '')
+    // Items per page: what the band's rows leave after its other rows. They
+    // are Src with its hint and pasted list; Target; Content with the New
+    // folder field and ⤴️ up; the table's frame, header and header line
+    // (terminal); a search's note and "Searching..."; the selection row (kept
+    // free, so ticking does not change the page); the Finder row, which may
+    // wrap; the copy result or the overwrite question; and on the desktop the
+    // small gaps between the rows with buttons.
+    const isTerminal = e.surface === 'terminal'
+    const otherRows =
+      1 +
+      ((await read($, hint)) !== null ? 1 : 0) +
+      parsePaths(await read($, draft)).length +
+      1 +
+      1 +
+      (naming ? 2 : 0) +
+      (dir !== '' ? 1 : 0) +
+      3 +
+      (isTerminal ? 1 : 0) +
+      (note !== null ? 1 : 0) +
+      (searching ? 1 : 0) +
+      (confirming ? 2 : 1) +
+      2 +
+      (result !== null && !hidden && !isBusy && ask === null ? 3 : 0) +
+      (ask !== null ? 2 : 0) +
+      (isTerminal ? 0 : 1)
+    const pageSize = pageSizeFor(e.props.maxRows, otherRows)
     // A page past the end (after a delete) shows the last page.
-    const pageCount = Math.max(1, Math.ceil(view.length / PAGE_SIZE))
+    const pageCount = Math.max(1, Math.ceil(view.length / pageSize))
     const shownPage = Math.min(listOpen ? await read($, page) : 0, pageCount - 1)
-    const pageNames = view.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE)
+    const pageNames = view.slice(shownPage * pageSize, (shownPage + 1) * pageSize)
     // The "│" and "─┼─" lines only meet the columns in the terminal's monospace
     // font; the desktop draws text in another font, so it gets the frame alone.
     const lines = e.surface === 'terminal'

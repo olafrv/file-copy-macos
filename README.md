@@ -131,7 +131,7 @@ If a name already exists in the target, the mod asks first:
   - The search shows at most 500 results and stops after 5 seconds. If it hits a limit, a yellow warning says so.
   - Skipped and ignored items are still in the table when you open their folder.
 - Click **Name** or **Size** in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
-- The list shows 4 items per page. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
+- The list shows 4 to 10 items per page: as many as fit, so the bar does not need to scroll. In a larger terminal window you see more items. The desktop app gives the bar less room, so it usually shows 4. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
 - Each row has five actions:
   - **↗️ Open:** opens a file in its default macOS app, a folder in Finder.
   - **📌 Finder:** opens Finder at the item's folder with the item selected. From there you can drag it.

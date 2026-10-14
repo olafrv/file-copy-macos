@@ -9,6 +9,7 @@ import {
   formatClock,
   humanSize,
   isSafeEntry,
+  pageSizeFor,
   parsePaths,
   parseZone,
   toFieldText,
@@ -1566,4 +1567,37 @@ test('a long Target path is shortened: first the text above the project, then th
   expect(await ui.find({ type: 'Text', text: '…/' })).toBeDefined()
   await ui.press({ key: 'list' })
   await ui.unmount()
+})
+
+test('a page shows as many items as the band has rows for: 4 to 10', async ($, on) => {
+  expect(pageSizeFor(40, 10)).toBe(10)
+  expect(pageSizeFor(17, 10)).toBe(7)
+  expect(pageSizeFor(12, 10)).toBe(4)
+
+  const names = Array.from({ length: 23 }, (_, i) => `f${i + 1}.txt`)
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? names : undefined))
+
+  // In the terminal the list view itself takes 10 rows: Src, Target,
+  // Content, the table's frame, header and header line, the selection row
+  // and the Finder row with room to wrap.
+  for (const [maxRows, perPage, pages] of [
+    [40, 10, 3],
+    [17, 7, 4],
+    [10, 4, 6],
+  ] as const) {
+    const ui = await $.ui.mount({
+      plugin: 'file-copy-macos',
+      surface: 'terminal',
+      ...BAND,
+      props: { ...BAND.props, maxRows },
+    })
+    await ui.press({ key: 'list' })
+    const rows = (await ui.findAll({ type: 'Button' })).filter(b => (b.key ?? '').startsWith('file:'))
+    expect(rows.length).toBe(perPage)
+    expect(await ui.find({ type: 'Text', text: `1/${pages} (#23)` })).toBeDefined()
+    await ui.press({ key: 'list' })
+    await ui.unmount()
+  }
 })

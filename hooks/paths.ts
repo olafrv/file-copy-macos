@@ -286,3 +286,15 @@ export const fitCrumbs = (
 
   return { above: '…/', crumbs: all }
 }
+
+/** The fewest and the most items a page of the file list shows. */
+export const MIN_PAGE_SIZE = 4
+export const MAX_PAGE_SIZE = 10
+
+/**
+ * Items per page: as many as the band's rows leave after everything else it
+ * draws, so the band need not scroll; at least MIN_PAGE_SIZE, at most
+ * MAX_PAGE_SIZE.
+ */
+export const pageSizeFor = (maxRows: number, otherRows: number): number =>
+  Math.max(MIN_PAGE_SIZE, Math.min(MAX_PAGE_SIZE, maxRows - otherRows))
