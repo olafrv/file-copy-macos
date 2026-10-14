@@ -56,6 +56,23 @@ claude plugin update file-copy-macos
 claude plugin uninstall file-copy-macos
 ```
 
+## Settings
+
+The mod has one setting, **Search: skip folders**: the folder names that 🔍 Find never searches (comma-separated). The default is `.git, .svn, .hg, node_modules, bower_components`.
+
+- **In a terminal:** run `claude`, type `/config` and change "Search: skip folders".
+- **In Claude Desktop:** the Code tab has no screen for plugin settings. Use a terminal as above (the setting is shared with the desktop app), or add this to `~/.claude/settings.json`:
+
+  ```json
+  "pluginConfigs": {
+    "file-copy-macos": {
+      "options": { "searchSkip": ".git, .svn, .hg, node_modules, bower_components, .venv" }
+    }
+  }
+  ```
+
+A change applies after `/reload-plugins` or in a new session.
+
 ## Requirements
 
 - macOS 15 or later.
@@ -110,7 +127,7 @@ If a name already exists in the target, the mod asks first:
 - **Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
 - **🔍 Find** (or Enter) searches the target folder and all folders below it. The table then gets a **Folder** column with each item's folder. Point at a folder there to see its full path; a click opens it. All actions work on the items found, and 📝 Ren keeps an item in its own folder. Typing in the filter again, 🧹 Clear or opening a folder ends the search.
   - In a git project, the search follows `.gitignore`: ignored files are not found. To skip a folder only on your Mac, add it to `.git/info/exclude`.
-  - The setting **Search: skip folders** (in `/config`) lists folder names the search always skips. The default is `.git, .svn, .hg, node_modules, bower_components`. Add others, for example `.venv` or `dist`.
+  - The setting **Search: skip folders** (see [Settings](#settings)) lists folder names the search always skips. The default is `.git, .svn, .hg, node_modules, bower_components`. Add others, for example `.venv` or `dist`.
   - The search shows at most 500 results and stops after 5 seconds. If it hits a limit, a yellow warning says so.
   - Skipped and ignored items are still in the table when you open their folder.
 - Click **Name** or **Size** in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
