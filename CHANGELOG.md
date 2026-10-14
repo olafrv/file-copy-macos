@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.17.1
+
+- Fainter row stripes, now on both surfaces. The desktop uses a see-through gray that works in light and dark mode, and still lights up the row under the pointer.
+- The table header stands out: Name, Folder and Size are brighter, and "Actions" is bold.
+- Fixed: in a narrow terminal the clock was cut ("19:18 CE…"). It now keeps its room, and only the 💡 Finder tip wraps.
+
 ## 1.17.0
 
 - Table rows are easier to tell apart: in the terminal every other row is striped; on the desktop the row under the pointer lights up. Both use the theme's soft gray, in light and dark mode.
