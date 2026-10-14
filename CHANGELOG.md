@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.17.3
+
+- 📚 Content shows the file list from the start of each session. 🙈 Hide still closes it.
+
 ## 1.17.2
 
 - Fewer tips: only 📥 Paste, 🧲 Download and the 💡 Finder tip show a help text, always on. The 💤 Tips switch is gone, and moving the pointer across the table no longer shows tips.
