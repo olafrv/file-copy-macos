@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.15.0
+
+- The file list shows 4 to 10 items per page: as many as fit without scrolling the bar. A larger terminal window shows more items. The desktop app gives the bar less room, so it usually shows 4.
+
 ## 1.14.2
 
 - A long 🎯 Target path is shortened to fit its row instead of being cut off: first the part above the project becomes "…/", then the folders in the middle become "…". The project folder and the current folder always stay visible.
