@@ -4,17 +4,17 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 
 ```
 📎 Src:     [Paste paths (↵ add)] 📥 Add   📄 Files  📂 Folder  📥 Paste  🧲 Download
-🎯 Target:  ~/Projects/my-app/docs   ↗️ Open  📌 Finder
+🎯 Target:  ~/Projects/my-app/docs   ↗️ Open  📌 Locate
 📚 Content: 🙈 Hide   🗂️ New folder   👻 Show .files   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
 ⤴️ my-app/
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ ☐  │ Name ▲            │ Size    │ Actions                                │
 │────┼───────────────────┼─────────┼────────────────────────────────────────│
-│ ☐  │ 📁 2026/          │         │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
-│ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
+│ ☐  │ 📁 2026/          │         │ ↗️ Open 📌 Locate 💬 Ask 📝 Ren 📋 Copy│
+│ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Locate 💬 Ask 📝 Ren 📋 Copy│
 └────────────────────────────────────────────────────────────────────────────┘
 1 selected:  ❌ Delete  💬 Ask  📋 Copy
-💡 Finder:  ⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add · 💤 Tips   13.10.2026 14:32 CEST · v1.17.1
+💡 Finder:  ⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add   13.10.2026 14:32 CEST · v1.17.1
 ✅ Copied:  report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -86,7 +86,7 @@ The mod is for macOS only, because it uses these macOS commands:
 | `/bin/mv` | 📝 Ren |
 | `/bin/mkdir` | 🗂️ New folder |
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
-| `/usr/bin/open` | ↗️ Open and 📌 Finder |
+| `/usr/bin/open` | ↗️ Open and 📌 Locate |
 | `/usr/bin/osascript` | 📄 Files and 📂 Folder pickers, 📋 Copy and 📥 Paste (clipboard) |
 | `/bin/date` | The time zone of the clock |
 | `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
@@ -95,7 +95,7 @@ Listing folders, file sizes, name checks, 🧲 Download and the search outside g
 
 ## What it does
 
-Click **💤 Tips** in the 💡 Finder row to turn on help tips; it turns green (**✅ Tips**) while they are on. Then point at a button to see a short help text above or below it. The tips appear at once (the app offers no delay), so they are off by default. The mod remembers your choice. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
+Point at 📥 Paste, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
 ### Copy files and folders
 
@@ -119,7 +119,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Target and contents
 
-- **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. A long path is shortened to fit: first the part above the project becomes "…/", then the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Finder** shows it in its parent folder, selected.
+- **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. A long path is shortened to fit: first the part above the project becomes "…/", then the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected.
 - **📚 Content** is a framed table with the columns tick box, Name, Size and Actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
@@ -135,7 +135,7 @@ If a name already exists in the target, the mod asks first:
 - The list shows 4 to 10 items per page: as many as fit, so the bar does not need to scroll. In a larger terminal window you see more items. The desktop app gives the bar less room, so it usually shows 4. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
 - Each row has five actions:
   - **↗️ Open:** opens a file in its default macOS app, a folder in Finder.
-  - **📌 Finder:** opens Finder at the item's folder with the item selected. From there you can drag it.
+  - **📌 Locate:** opens Finder at the item's folder with the item selected. From there you can drag it.
   - **💬 Ask:** see below.
   - **📝 Ren:** renames the item.
   - **📋 Copy:** puts the item on the clipboard as a file. Press Cmd+V in Finder, on the Desktop, in Mail or in Slack to paste it.
@@ -168,7 +168,7 @@ The note does not start a turn. Claude reads it with your next message and does 
 
 ## Limits
 
-- **No drag and drop.** The mod API has no drag events, in either direction. To bring files in, use paste (Option+Cmd+C) or the pickers. To take files out, use **📋 Copy** or **📌 Finder**.
+- **No drag and drop.** The mod API has no drag events, in either direction. To bring files in, use paste (Option+Cmd+C) or the pickers. To take files out, use **📋 Copy** or **📌 Locate**.
 - **Buttons use the app's own style.** A mod cannot change their color or font size.
 - **Folder sizes are not shown.** Reading every file in a big folder would be slow.
 - **The search finds names, not file contents.** It does not look inside files.

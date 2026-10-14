@@ -1189,7 +1189,7 @@ test('Copy puts items on the clipboard, also the ticked ones; Finder selects one
   expect(runs[0]?.slice(5)).toEqual(['/proj/docs', '/proj/My File.txt'])
 
   // Finder and Copy are row actions, for files and folders alike.
-  expect((await ui.find({ key: 'show:docs/' }))?.props.label).toBe('📌 Finder')
+  expect((await ui.find({ key: 'show:docs/' }))?.props.label).toBe('📌 Locate')
   await ui.press({ key: 'show:docs/' })
   await ui.press({ key: 'show:My File.txt' })
   expect(runs.slice(1)).toEqual([
@@ -1460,62 +1460,45 @@ test('Clear goes back to page 1', async ($, on) => {
   await ui.unmount()
 })
 
-test('the Tips switch turns the buttons\' help tips on and off, and is remembered', async ($, on) => {
-  mock.store(on)
+test('only the buttons whose label does not say enough carry a help tip', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
   fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf'] : undefined))
-  on('session.start', () => ({ cwd: '/proj' }))
 
-  const tips = [
-    ' Pick files to copy into the target ',
+  const kept = [
+    ' Copy here the files you copied in Finder with Cmd+C ',
     ' Copy here the newest item of ~/Downloads ',
+    ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📥 Paste, or copy their paths with Option+Command+C, paste them into Src and press 📥 Add ',
+  ]
+  const gone = [
+    ' Show the target folder selected in its parent folder ',
+    ' Pick files to copy into the target ',
     ' Open the target folder in Finder ',
     ' Create a folder in the target and open it ',
     ' Sort by size; click again to reverse ',
     ' Put @path into the prompt to ask Claude about it ',
     ' Put the ticked items on the clipboard as files ',
-    ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📥 Paste, or copy their paths with Option+Command+C, paste them into Src and press 📥 Add ',
   ]
-  const shown = async (ui: { find: (q: object) => Promise<{ props: { inverse?: unknown } } | undefined> }) => {
-    const found = await Promise.all(tips.map(text => ui.find({ type: 'Text', text })))
-    return found.map(t => t?.props.inverse === true)
-  }
-
-  await $.session.start({ cwd: '/proj', surface: 'terminal', isInteractive: true })
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
     await ui.press({ key: 'list' })
     await ui.press({ key: 'tick:a.pdf' })
 
-    // Off at first: no tips, and the button keeps its key in its box.
-    expect((await ui.find({ key: 'tips' }))?.props.label).toBe('💤 Tips')
-    expect(await shown(ui)).toEqual(tips.map(() => false))
-    expect(await ui.find({ key: 'tip:pick' })).toBeDefined()
-    expect(await ui.find({ key: 'pick' })).toBeDefined()
+    // Always there, revealed while the pointer is over its button; no switch.
+    for (const text of kept) {
+      expect((await ui.find({ type: 'Text', text }))?.props.inverse).toBe(true)
+    }
 
-    // On: every tip is there, revealed while the pointer is over its button.
-    await ui.press({ key: 'tips' })
-    expect((await ui.find({ key: 'tips' }))?.props.label).toBe('✅ Tips')
-    expect(await shown(ui)).toEqual(tips.map(() => true))
+    for (const text of gone) {
+      expect(await ui.find({ type: 'Text', text })).toBeUndefined()
+    }
 
-    // Off again.
-    await ui.press({ key: 'tips' })
-    expect(await shown(ui)).toEqual(tips.map(() => false))
+    expect(await ui.find({ key: 'tips' })).toBeUndefined()
     await ui.press({ key: 'tick:a.pdf' })
     await ui.press({ key: 'list' })
     await ui.unmount()
   }
-
-  // The choice stays for the next session.
-  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
-  await ui.press({ key: 'tips' })
-  await ui.unmount()
-  await $.session.start({ cwd: '/proj', surface: 'desktop', isInteractive: true })
-  const next = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
-  expect((await next.find({ key: 'tips' }))?.props.label).toBe('✅ Tips')
-  await next.unmount()
 })
 
 test('a long Target path is shortened: first the text above the project, then the middle', async ($, on) => {
