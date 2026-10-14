@@ -5,6 +5,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import {
+  fitCrumbs,
   formatClock,
   humanSize,
   isSafeEntry,
@@ -1513,4 +1514,56 @@ test('the Tips switch turns the buttons\' help tips on and off, and is remembere
   const next = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
   expect((await next.find({ key: 'tips' }))?.props.label).toBe('✅ Tips')
   await next.unmount()
+})
+
+test('a long Target path is shortened: first the text above the project, then the middle', async ($, on) => {
+  const above = '~/Documents/Claude/Code/'
+  const parts = ['my-project', 'docs', '2026', 'q3', 'reports']
+
+  // It fits: all of it.
+  expect(fitCrumbs(above, parts, 80)).toEqual({ above, crumbs: [0, 1, 2, 3, 4] })
+  // The text above the project becomes "…/".
+  expect(fitCrumbs(above, parts, 40)).toEqual({ above: '…/', crumbs: [0, 1, 2, 3, 4] })
+  // The middle folders become "…": the project and the last ones stay.
+  expect(fitCrumbs(above, parts, 28)).toEqual({ above: '…/', crumbs: [0, 'gap', 3, 4] })
+  // Never less than the project and the current folder.
+  expect(fitCrumbs(above, parts, 5)).toEqual({ above: '…/', crumbs: [0, 'gap', 4] })
+  // The desktop's padding per button counts too: here three folders still fit.
+  expect(fitCrumbs(above, parts, 40, 2)).toEqual({ above: '…/', crumbs: [0, 'gap', 2, 3, 4] })
+
+  // In the band: a terminal of 60 columns, four folders deep, leaves 29 cells
+  // for the path: the project, "…", then q3 and reports.
+  const tree: Record<string, string[]> = {
+    '/Users/me/Documents/Claude/Code/my-project': ['docs/'],
+    '/Users/me/Documents/Claude/Code/my-project/docs': ['2026/'],
+    '/Users/me/Documents/Claude/Code/my-project/docs/2026': ['q3/'],
+    '/Users/me/Documents/Claude/Code/my-project/docs/2026/q3': ['reports/'],
+    '/Users/me/Documents/Claude/Code/my-project/docs/2026/q3/reports': [],
+  }
+  on('session.root', () => ({ value: '/Users/me/Documents/Claude/Code/my-project' }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => tree[dir])
+  const ui = await $.ui.mount({
+    plugin: 'file-copy-macos',
+    surface: 'terminal',
+    ...BAND,
+    props: { ...BAND.props, bodyColumns: 60 },
+  })
+  await ui.press({ key: 'list' })
+
+  for (const folder of ['docs/', '2026/', 'q3/', 'reports/']) {
+    await ui.press({ key: `dir:${folder}` })
+  }
+
+  expect(await crumbs(ui)).toEqual(['my-project', 'q3', 'reports'])
+  expect(await ui.find({ type: 'Text', text: '…' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '…/' })).toBeDefined()
+
+  // The project folder stays one click away.
+  await ui.press({ key: 'crumb:0' })
+  expect(await crumbs(ui)).toEqual(['my-project'])
+  // "~/Documents/Claude/Code/my-project" needs 34 cells: still "…/" here.
+  expect(await ui.find({ type: 'Text', text: '…/' })).toBeDefined()
+  await ui.press({ key: 'list' })
+  await ui.unmount()
 })

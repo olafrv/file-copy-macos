@@ -245,3 +245,44 @@ export const isSafeEntry = (entry: string): boolean => {
     bare.split('/').every(part => part !== '' && part !== '.' && part !== '..')
   )
 }
+
+/** One part of a shortened path: a folder by its index, or "…" for the folders left out. */
+export type Crumb = number | 'gap'
+
+/**
+ * Fits a path into `width` cells: the text above the project, then the
+ * folders from the project down, "/" between them. `extra` is what each
+ * folder button costs beyond its name (the desktop's padding). First the
+ * text above the project becomes "…/"; then the folders in the middle become
+ * one "…", keeping the project folder and as many of the last ones as fit.
+ */
+export const fitCrumbs = (
+  above: string,
+  parts: readonly string[],
+  width: number,
+  extra = 0,
+): { above: string; crumbs: Crumb[] } => {
+  const cost = (index: number) => [...(parts[index] ?? '')].length + extra
+  const length = (crumbs: readonly Crumb[]) =>
+    crumbs.reduce<number>((sum, c) => sum + (c === 'gap' ? 1 : cost(c)), 0) + crumbs.length - 1
+  const all = parts.map((_, i) => i)
+
+  if ([...above].length + length(all) <= width) {
+    return { above, crumbs: all }
+  }
+
+  if (2 + length(all) <= width || parts.length <= 2) {
+    return { above: '…/', crumbs: all }
+  }
+
+  // The project folder, "…", then the last k folders: as many as fit, at least one.
+  for (let k = parts.length - 2; k >= 1; k -= 1) {
+    const crumbs: Crumb[] = [0, 'gap', ...all.slice(parts.length - k)]
+
+    if (2 + length(crumbs) <= width || k === 1) {
+      return { above: '…/', crumbs }
+    }
+  }
+
+  return { above: '…/', crumbs: all }
+}

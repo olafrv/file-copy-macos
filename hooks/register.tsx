@@ -9,6 +9,7 @@ import {
   baseName,
   entryFolder,
   entryName,
+  fitCrumbs,
   fitStart,
   formatClock,
   humanSize,
@@ -1176,6 +1177,15 @@ export const register: Register = (on, options) => {
     // tick box), the frame 2 sides, and in the terminal 3 "│" between them.
     const tickWidth = lines ? TICK_WIDTH : DESKTOP_TICK_WIDTH
     const labelWidth = lines ? LABEL_WIDTH : DESKTOP_LABEL_WIDTH
+    // The Target path: what is left of the row after the label and the two
+    // buttons (with their padding on the desktop).
+    const pathParts = [baseName(root), ...(dir === '' ? [] : dir.split('/'))]
+    const path = fitCrumbs(
+      `${shortPath(parentOf(root))}/`,
+      pathParts,
+      e.props.bodyColumns - labelWidth - 1 - (lines ? 19 : 27),
+      lines ? 0 : 2,
+    )
     // The desktop's buttons have a frame: buttons in rows one above the other
     // touched. A part of a row keeps them apart; the terminal needs none.
     const rowSpace = lines ? 0 : 0.3
@@ -1336,18 +1346,23 @@ export const register: Register = (on, options) => {
           </Box>
           {/* The path: the part above the project as text, then one button per
               folder from the project down; a click makes it the target. */}
+          {/* A long path is shortened to fit the row: see fitCrumbs. */}
           <Box flexDirection="row" flexShrink={1}>
-            <Text dimColor wrap="truncate-start">{`${shortPath(parentOf(root))}/`}</Text>
-            {[baseName(root), ...(dir === '' ? [] : dir.split('/'))].map((part, i, parts) => (
-              <Box key={`crumb-box:${i}`} flexDirection="row">
-                {i > 0 && <Text dimColor>/</Text>}
-                <Button
-                  key={`crumb:${i}`}
-                  label={part}
-                  plain
-                  dimColor={i < parts.length - 1}
-                  onPress={() => openFolder($, parts.slice(1, i + 1).join('/'))}
-                />
+            <Text dimColor>{path.above}</Text>
+            {path.crumbs.map((crumb, at) => (
+              <Box key={`crumb-box:${crumb}`} flexDirection="row">
+                {at > 0 && <Text dimColor>/</Text>}
+                {crumb === 'gap' ? (
+                  <Text dimColor>…</Text>
+                ) : (
+                  <Button
+                    key={`crumb:${crumb}`}
+                    label={pathParts[crumb] ?? ''}
+                    plain
+                    dimColor={crumb < pathParts.length - 1}
+                    onPress={() => openFolder($, pathParts.slice(1, crumb + 1).join('/'))}
+                  />
+                )}
               </Box>
             ))}
           </Box>
