@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.2
+
+- A long 🎯 Target path is shortened to fit its row instead of being cut off: first the part above the project becomes "…/", then the folders in the middle become "…". The project folder and the current folder always stay visible.
+
 ## 1.14.1
 
 - README: a new Settings section explains how to change "Search: skip folders", with `/config` in a terminal or in `~/.claude/settings.json` (the Code tab of Claude Desktop has no screen for plugin settings).
