@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.17.0
+
+- Table rows are easier to tell apart: in the terminal every other row is striped; on the desktop the row under the pointer lights up. Both use the theme's soft gray, in light and dark mode.
+
 ## 1.16.0
 
 - Hidden names (starting with ".", for example `.env` or `.claude`) are now hidden by default, as in Finder, in the list and in search results.
