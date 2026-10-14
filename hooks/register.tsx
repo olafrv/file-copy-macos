@@ -182,6 +182,10 @@ const pickScript = (kind: PickKind): string[] => [
 // Where the version links to: the README on GitHub. On the desktop only.
 const HELP_URL = 'https://github.com/olafrv/file-copy-macos#readme'
 
+// The background that tells table rows apart: a theme key, so it follows the
+// person's light or dark theme.
+const ROW_COLOR = 'subtle'
+
 // The file list's columns, in terminal cells: the tick box, the size
 // ("999 KB"), the actions ("↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy") and the least
 // the name gets.
@@ -1680,7 +1684,7 @@ export const register: Register = (on, options) => {
                         .join('┼')}
                     </Text>
                   )}
-                  {pageNames.map(name =>
+                  {pageNames.map((name, index) =>
                     editing === name ? (
                       <Box key={`edit:${name}`} flexDirection="column" paddingX={1}>
                         <Box flexDirection="row" gap={1}>
@@ -1707,7 +1711,15 @@ export const register: Register = (on, options) => {
                         {editError !== null && <Text color="yellow">{editError}</Text>}
                       </Box>
                     ) : (
-                      <Box key={`row:${name}`} flexDirection="row">
+                      // Rows told apart: in the terminal every other row is striped
+                      // (it needs no pointer); on the desktop the row under the
+                      // pointer lights up (a keyed Box is a hover scope).
+                      <Box
+                        key={`row:${name}`}
+                        flexDirection="row"
+                        backgroundColor={lines && index % 2 === 1 ? ROW_COLOR : undefined}
+                        hover={lines ? undefined : { backgroundColor: ROW_COLOR }}
+                      >
                         <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
                           <Button
                             key={`tick:${name}`}

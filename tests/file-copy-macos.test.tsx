@@ -1666,3 +1666,39 @@ test('hidden names are hidden as in Finder, until the switch shows them', async 
   expect((await next.find({ key: 'dotfiles' }))?.props.label).toBe('👻 Hide .files')
   await next.unmount()
 })
+
+test('rows are told apart: stripes in the terminal, a hover light on the desktop', async ($, on) => {
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? ['a.txt', 'b.txt', 'c.txt'] : undefined))
+
+  // Terminal: every other row has the theme's subtle background.
+  const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
+  await terminal.press({ key: 'list' })
+  const stripes = await Promise.all(
+    ['a.txt', 'b.txt', 'c.txt'].map(async n => (await terminal.find({ key: `row:${n}` }))?.props.backgroundColor),
+  )
+  expect(stripes).toEqual([undefined, 'subtle', undefined])
+  await terminal.press({ key: 'list' })
+  await terminal.unmount()
+
+  // Desktop: no stripes; the row under the pointer lights up.
+  const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  await desktop.press({ key: 'list' })
+  const row = await desktop.find({ key: 'row:b.txt' })
+  expect(row?.props.backgroundColor).toBeUndefined()
+  // The hover style is in the drawn tree, beside the element's props.
+  const inTree = (node: unknown, key: string): { hover?: unknown } | undefined => {
+    if (node === null || typeof node !== 'object') return undefined
+    const element = node as { props?: { key?: unknown }; children?: unknown[] }
+    if (element.props?.key === key) return element as { hover?: unknown }
+    for (const child of element.children ?? []) {
+      const found = inTree(child, key)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+  expect(inTree(await desktop.drawn(), 'row:b.txt')?.hover).toEqual({ backgroundColor: 'subtle' })
+  await desktop.press({ key: 'list' })
+  await desktop.unmount()
+})
