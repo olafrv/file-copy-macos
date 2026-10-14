@@ -9,6 +9,7 @@ import {
   formatClock,
   humanSize,
   isSafeEntry,
+  isHiddenEntry,
   pageSizeFor,
   parsePaths,
   parseZone,
@@ -1600,4 +1601,68 @@ test('a page shows as many items as the band has rows for: 4 to 10', async ($, o
     await ui.press({ key: 'list' })
     await ui.unmount()
   }
+})
+
+test('hidden names are hidden as in Finder, until the switch shows them', async ($, on) => {
+  expect(isHiddenEntry('.env')).toBe(true)
+  expect(isHiddenEntry('.claude/')).toBe(true)
+  expect(isHiddenEntry('docs/.cache/x.txt')).toBe(true)
+  expect(isHiddenEntry('docs/a.pdf')).toBe(false)
+  expect(isHiddenEntry('my.file.txt')).toBe(false)
+
+  mock.store(on)
+  mock.clock(on)
+  on('session.root', () => ({ value: '/proj' }))
+  on('session.start', () => ({ cwd: '/proj' }))
+  on('process.run', ($, e) => ({
+    value: e.argv.includes('rev-parse') ? { ...ran(''), exitCode: 128 } : ran(''),
+  }))
+  fakeFs(on, dir =>
+    dir === '/proj'
+      ? ['.claude/', 'docs/', '.env', 'a.pdf']
+      : dir === '/proj/docs'
+        ? ['.cache/', 'env.md']
+        : dir === '/proj/.claude' || dir === '/proj/docs/.cache'
+          ? ['env.json']
+          : undefined,
+  )
+  await $.session.start({ cwd: '/proj', surface: 'desktop', isInteractive: true })
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  await ui.press({ key: 'list' })
+
+  // Hidden at first.
+  expect((await ui.find({ key: 'dotfiles' }))?.props.label).toBe('👻 Show .files')
+  expect(await ui.find({ key: 'file:.env' })).toBeUndefined()
+  expect(await ui.find({ key: 'dir:.claude/' })).toBeUndefined()
+  expect(await ui.find({ key: 'file:a.pdf' })).toBeDefined()
+
+  // Shown after a click; a hidden item can be ticked.
+  await ui.press({ key: 'dotfiles' })
+  expect((await ui.find({ key: 'dotfiles' }))?.props.label).toBe('👻 Hide .files')
+  expect(await ui.find({ key: 'file:.env' })).toBeDefined()
+  expect(await ui.find({ key: 'dir:.claude/' })).toBeDefined()
+  await ui.press({ key: 'tick:.env' })
+  await ui.press({ key: 'tick:a.pdf' })
+  expect(await ui.find({ type: 'Text', text: '2 selected:' })).toBeDefined()
+
+  // Hidden again: the hidden item is unticked, the other stays ticked.
+  await ui.press({ key: 'dotfiles' })
+  expect(await ui.find({ type: 'Text', text: '1 selected:' })).toBeDefined()
+
+  // The search leaves out hidden names and anything in hidden folders.
+  await ui.input({ key: 'filter-0', text: 'env' })
+  expect(await ui.find({ key: 'file:docs/env.md' })).toBeDefined()
+  expect(await ui.find({ key: 'file:.env' })).toBeUndefined()
+  expect(await ui.find({ key: 'file:.claude/env.json' })).toBeUndefined()
+  expect(await ui.find({ key: 'file:docs/.cache/env.json' })).toBeUndefined()
+  await ui.press({ key: 'dotfiles' })
+  expect(await ui.find({ key: 'file:.claude/env.json' })).toBeDefined()
+  await ui.unmount()
+
+  // The choice stays for the next session.
+  await $.session.start({ cwd: '/proj', surface: 'desktop', isInteractive: true })
+  const next = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  expect((await next.find({ key: 'dotfiles' }))?.props.label).toBe('👻 Hide .files')
+  await next.unmount()
 })

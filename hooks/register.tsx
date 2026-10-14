@@ -10,6 +10,7 @@ import {
   entryFolder,
   entryName,
   fitCrumbs,
+  isHiddenEntry,
   pageSizeFor,
   fitStart,
   formatClock,
@@ -85,6 +86,24 @@ const isHidden = atom({ plugin: 'file-copy-macos', key: 'isHidden' } as const, f
 // delay, so they are for learning, not for every day.
 const tipsAtom = atom({ plugin: 'file-copy-macos', key: 'tipsOn' } as const, false)
 const TIPS_KEY = 'tipsOn'
+// Whether the list shows hidden names (starting with "."), as Finder's
+// Cmd+Shift+. does; saved in the store. Off by default, as in Finder.
+const dotsAtom = atom({ plugin: 'file-copy-macos', key: 'showDotfiles' } as const, false)
+const DOTS_KEY = 'showDotfiles'
+
+const toggleDotfiles = async ($: EngineInterface) => {
+  const isShown = !(await read($, dotsAtom))
+
+  await update($, dotsAtom, () => isShown)
+  await update($, page, () => 0)
+
+  // Hidden again: a tick on an item no longer shown would act unseen.
+  if (!isShown) {
+    await update($, selected, list => list.filter(name => !isHiddenEntry(name)))
+  }
+
+  await $.store.set(DOTS_KEY, isShown)
+}
 
 const toggleTips = async ($: EngineInterface) => {
   const isOn = !(await read($, tipsAtom))
@@ -1109,6 +1128,8 @@ export const register: Register = (on, options) => {
     await update($, tipsAtom, () => false)
     const savedTips = await $.store.get(TIPS_KEY).catch(() => undefined)
     await update($, tipsAtom, () => savedTips === true)
+    const savedDots = await $.store.get(DOTS_KEY).catch(() => undefined)
+    await update($, dotsAtom, () => savedDots === true)
     await startClock($)
     await update($, last, () => null)
     await update($, subdir, () => '')
@@ -1162,7 +1183,14 @@ export const register: Register = (on, options) => {
     const by = await read($, sortBy)
     const desc = await read($, isSortDesc)
     // The search already matched the names; the live filter is for the target alone.
-    const view = viewEntries(names, sizeOf, showFolder ? '' : filterText, by, desc)
+    const showDots = await read($, dotsAtom)
+    const view = viewEntries(
+      showDots ? names : names.filter(name => !isHiddenEntry(name)),
+      sizeOf,
+      showFolder ? '' : filterText,
+      by,
+      desc,
+    )
     const arrow = (key: SortKey) => (by === key ? (desc ? ' ▼' : ' ▲') : '')
     // Items per page: what the band's rows leave after its other rows. They
     // are Src with its hint and pasted list; Target; Content with the New
@@ -1440,6 +1468,20 @@ export const register: Register = (on, options) => {
               )}
             </Box>
           )}
+          <Box key="tip:dotfiles">
+            <Button
+              key="dotfiles"
+              label={showDots ? '👻 Hide .files' : '👻 Show .files'}
+              plain
+              dimColor={!showDots}
+              onPress={() => toggleDotfiles($)}
+            />
+            {tipsOn && (
+              <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Show or hide names that start with ".", as Cmd+Shift+. in Finder `}</Text>
+              </Box>
+            )}
+          </Box>
           {/* The terminal draws the field as wide as its box; the desktop at its
               own width, so a fixed box there would push Clear away. */}
           <Box width={lines ? 38 : undefined}>

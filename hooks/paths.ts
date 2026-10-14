@@ -298,3 +298,10 @@ export const MAX_PAGE_SIZE = 10
  */
 export const pageSizeFor = (maxRows: number, otherRows: number): number =>
   Math.max(MIN_PAGE_SIZE, Math.min(MAX_PAGE_SIZE, maxRows - otherRows))
+
+/** Whether an entry is hidden as Finder hides it: a name in its path starts with ".". */
+export const isHiddenEntry = (entry: string): boolean =>
+  entry
+    .replace(/\/$/, '')
+    .split('/')
+    .some(part => part.startsWith('.'))

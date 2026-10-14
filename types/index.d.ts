@@ -31,6 +31,7 @@ declare module 'claude-code' {
       pending: Pending | null
       isHidden: boolean
       tipsOn: boolean
+      showDotfiles: boolean
       isListOpen: boolean
       entries: string[]
       sizes: { [name: string]: number }

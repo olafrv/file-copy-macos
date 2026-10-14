@@ -5,7 +5,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 ```
 📎 Src:     [Paste paths (↵ add)] 📥 Add   📄 Files  📂 Folder  📥 Paste  🧲 Download
 🎯 Target:  ~/Projects/my-app/docs   ↗️ Open  📌 Finder
-📚 Content: 🙈 Hide   🗂️ New folder   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
+📚 Content: 🙈 Hide   🗂️ New folder   👻 Show .files   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
 ⤴️ my-app/
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ ☐  │ Name ▲            │ Size    │ Actions                                │
@@ -124,6 +124,7 @@ If a name already exists in the target, the mod asks first:
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - **🗂️ New folder** creates a folder in the target and opens it.
+- Names that start with "." (for example `.env` or `.claude`) are hidden, as in Finder. **👻 Show .files** shows them, in the list and in search results; **👻 Hide .files** hides them again. The mod remembers your choice.
 - **Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
 - **🔍 Find** (or Enter) searches the target folder and all folders below it. The table then gets a **Folder** column with each item's folder. Point at a folder there to see its full path; a click opens it. All actions work on the items found, and 📝 Ren keeps an item in its own folder. Typing in the filter again, 🧹 Clear or opening a folder ends the search.
   - In a git project, the search follows `.gitignore`: ignored files are not found. To skip a folder only on your Mac, add it to `.git/info/exclude`.
