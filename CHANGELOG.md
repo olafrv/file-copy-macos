@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.1
+
+- README: a new Settings section explains how to change "Search: skip folders", with `/config` in a terminal or in `~/.claude/settings.json` (the Code tab of Claude Desktop has no screen for plugin settings).
+
 ## 1.14.0
 
 - New help tips: point at a button to see what it does. Turn them on with **💤 Tips** in the 💡 Finder row (it becomes **✅ Tips**). They are off by default, because the app shows them at once, without a delay. The mod remembers your choice.
