@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.0
+
+- Hidden names (starting with ".", for example `.env` or `.claude`) are now hidden by default, as in Finder, in the list and in search results.
+- New switch **👻 Show .files** / **👻 Hide .files** in the 📚 Content row. The mod remembers your choice.
+
 ## 1.15.0
 
 - The file list shows 4 to 10 items per page: as many as fit without scrolling the bar. A larger terminal window shows more items. The desktop app gives the bar less room, so it usually shows 4.
