@@ -1129,6 +1129,11 @@ export const register: Register = (on, options) => {
     await update($, subdir, () => '')
     await endSearch($)
     await update($, isSearching, () => false)
+    // The content shows from the start; 🙈 Hide closes it for this session.
+    await update($, selected, () => [])
+    await update($, page, () => 0)
+    await update($, isListOpen, () => true)
+    await loadEntries($)
 
     return next(e)
   })

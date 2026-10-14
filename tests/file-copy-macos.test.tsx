@@ -1612,7 +1612,9 @@ test('hidden names are hidden as in Finder, until the switch shows them', async 
   await $.session.start({ cwd: '/proj', surface: 'desktop', isInteractive: true })
 
   const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
-  await ui.press({ key: 'list' })
+
+  // A session starts with the content shown.
+  expect((await ui.find({ key: 'list' }))?.props.label).toBe('🙈 Hide')
 
   // Hidden at first.
   expect((await ui.find({ key: 'dotfiles' }))?.props.label).toBe('👻 Show .files')

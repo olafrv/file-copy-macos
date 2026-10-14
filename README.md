@@ -120,6 +120,7 @@ If a name already exists in the target, the mod asks first:
 ### Target and contents
 
 - **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. A long path is shortened to fit: first the part above the project becomes "…/", then the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected.
+- **📚 Content** shows when a session starts; **🙈 Hide** closes it and **👀 Show** opens it again.
 - **📚 Content** is a framed table with the columns tick box, Name, Size and Actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
