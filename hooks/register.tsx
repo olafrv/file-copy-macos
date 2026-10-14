@@ -78,6 +78,18 @@ const folderError = atom({ plugin: 'file-copy-macos', key: 'folderError' } as co
 const renaming = atom({ plugin: 'file-copy-macos', key: 'renaming' } as const, null)
 const renameError = atom({ plugin: 'file-copy-macos', key: 'renameError' } as const, null)
 const isHidden = atom({ plugin: 'file-copy-macos', key: 'isHidden' } as const, false)
+// Whether the buttons show their help tips; saved in the store, so the choice
+// stays across sessions. Off by default: the app shows a tip at once, with no
+// delay, so they are for learning, not for every day.
+const tipsAtom = atom({ plugin: 'file-copy-macos', key: 'tipsOn' } as const, false)
+const TIPS_KEY = 'tipsOn'
+
+const toggleTips = async ($: EngineInterface) => {
+  const isOn = !(await read($, tipsAtom))
+
+  await update($, tipsAtom, () => isOn)
+  await $.store.set(TIPS_KEY, isOn)
+}
 
 // Copies each source into the folder given first. The mode decides what
 // happens when the name is already taken there:
@@ -198,7 +210,11 @@ const DESKTOP_LABEL_WIDTH = 10
 
 // The two ways from Finder: files on the clipboard, or their paths as text.
 // The row's label says "Finder:".
-const FINDER_TIP = 'Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add'
+const FINDER_TIP = '⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add'
+// The same in words, shown with tips on.
+const FINDER_TIP_LONG =
+  '⌘ = Command, ⌥ = Option. Copy files in Finder and press 📥 Paste, or copy their ' +
+  'paths with Option+Command+C, paste them into Src and press 📥 Add'
 
 const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use 📄 Files or 📂 Folder.'
 
@@ -1091,6 +1107,9 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await update($, version, () => null)
     await loadVersion($)
+    await update($, tipsAtom, () => false)
+    const savedTips = await $.store.get(TIPS_KEY).catch(() => undefined)
+    await update($, tipsAtom, () => savedTips === true)
     await startClock($)
     await update($, last, () => null)
     await update($, subdir, () => '')
@@ -1115,6 +1134,7 @@ export const register: Register = (on, options) => {
     const root = await $.session.root()
     const dir = await read($, subdir)
     const modVersion = await read($, version)
+    const tipsOn = await read($, tipsAtom)
     const shownMinute = await read($, clockNow)
     const clock =
       shownMinute === 0
@@ -1240,26 +1260,54 @@ export const register: Register = (on, options) => {
               {count === 1 ? '1 item' : `${count} items`}
             </Text>
           )}
-          <Button
-            key="pick"
-            label="📄 Files"
-            onPress={() => pickAndCopy($, 'files')}
-          />
-          <Button
-            key="pick-folder"
-            label="📂 Folder"
-            onPress={() => pickAndCopy($, 'folders')}
-          />
-          <Button
-            key="paste-files"
-            label="📥 Paste"
-            onPress={() => pasteFromClipboard($)}
-          />
-          <Button
-            key="latest-download"
-            label="🧲 Download"
-            onPress={() => copyLatestDownload($)}
-          />
+          <Box key="tip:pick">
+            <Button
+              key="pick"
+              label="📄 Files"
+              onPress={() => pickAndCopy($, 'files')}
+            />
+            {tipsOn && (
+              <Box position="absolute" top={1} left={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Pick files to copy into the target `}</Text>
+              </Box>
+            )}
+          </Box>
+          <Box key="tip:pick-folder">
+            <Button
+              key="pick-folder"
+              label="📂 Folder"
+              onPress={() => pickAndCopy($, 'folders')}
+            />
+            {tipsOn && (
+              <Box position="absolute" top={1} left={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Pick folders to copy into the target `}</Text>
+              </Box>
+            )}
+          </Box>
+          <Box key="tip:paste-files">
+            <Button
+              key="paste-files"
+              label="📥 Paste"
+              onPress={() => pasteFromClipboard($)}
+            />
+            {tipsOn && (
+              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Copy here the files you copied in Finder with Cmd+C `}</Text>
+              </Box>
+            )}
+          </Box>
+          <Box key="tip:latest-download">
+            <Button
+              key="latest-download"
+              label="🧲 Download"
+              onPress={() => copyLatestDownload($)}
+            />
+            {tipsOn && (
+              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Copy here the newest item of ~/Downloads `}</Text>
+              </Box>
+            )}
+          </Box>
         </Box>
         {message !== null && (
           <Box flexDirection="row" gap={1}>
@@ -1304,26 +1352,54 @@ export const register: Register = (on, options) => {
             ))}
           </Box>
           {/* Real buttons, as Files and Folder in the row above. */}
-          <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
-          <Button key="finder-target" label="📌 Finder" onPress={() => showInFinder($, '')} />
+          <Box key="tip:open-target">
+            <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
+            {tipsOn && (
+              <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Open the target folder in Finder `}</Text>
+              </Box>
+            )}
+          </Box>
+          <Box key="tip:finder-target">
+            <Button key="finder-target" label="📌 Finder" onPress={() => showInFinder($, '')} />
+            {tipsOn && (
+              <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Show the target folder selected in its parent folder `}</Text>
+              </Box>
+            )}
+          </Box>
         </Box>
         <Box flexDirection="row" gap={1} marginTop={rowSpace}>
           <Box width={labelWidth}>
             <Text>📚 Content:</Text>
           </Box>
-          <Button
-            key="list"
-            label={listOpen ? '🙈 Hide' : '👀 Show'}
-            plain
-            onPress={() => toggleList($)}
-          />
-          {!naming && (
+          <Box key="tip:list">
             <Button
-              key="new-folder"
-              label="🗂️ New folder"
+              key="list"
+              label={listOpen ? '🙈 Hide' : '👀 Show'}
               plain
-              onPress={() => update($, isNamingFolder, () => true)}
+              onPress={() => toggleList($)}
             />
+            {tipsOn && (
+              <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Show or hide what the target folder holds `}</Text>
+              </Box>
+            )}
+          </Box>
+          {!naming && (
+            <Box key="tip:new-folder">
+              <Button
+                key="new-folder"
+                label="🗂️ New folder"
+                plain
+                onPress={() => update($, isNamingFolder, () => true)}
+              />
+              {tipsOn && (
+                <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                  <Text inverse>{` Create a folder in the target and open it `}</Text>
+                </Box>
+              )}
+            </Box>
           )}
           {/* The terminal draws the field as wide as its box; the desktop at its
               own width, so a fixed box there would push Clear away. */}
@@ -1338,26 +1414,47 @@ export const register: Register = (on, options) => {
             />
           </Box>
           {filterText !== '' && (
-            <Button key="clear-filter" label="🧹 Clear" plain dimColor onPress={() => clearFilter($)} />
+            <Box key="tip:clear-filter">
+              <Button key="clear-filter" label="🧹 Clear" plain dimColor onPress={() => clearFilter($)} />
+              {tipsOn && (
+                <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                  <Text inverse>{` Remove the filter and show the whole folder `}</Text>
+                </Box>
+              )}
+            </Box>
           )}
           {listOpen && pageCount > 1 && (
             <Box flexDirection="row" gap={1}>
               {shownPage > 0 && (
-                <Button
-                  key="page-prev"
-                  label="◀"
-                  plain
-                  onPress={() => update($, page, () => shownPage - 1)}
-                />
+                <Box key="tip:page-prev">
+                  <Button
+                    key="page-prev"
+                    label="◀"
+                    plain
+                    onPress={() => update($, page, () => shownPage - 1)}
+                  />
+                  {tipsOn && (
+                    <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                      <Text inverse>{` Previous page `}</Text>
+                    </Box>
+                  )}
+                </Box>
               )}
               <Text dimColor>{`${shownPage + 1}/${pageCount} (#${view.length})`}</Text>
               {shownPage < pageCount - 1 && (
-                <Button
-                  key="page-next"
-                  label="▶"
-                  plain
-                  onPress={() => update($, page, () => shownPage + 1)}
-                />
+                <Box key="tip:page-next">
+                  <Button
+                    key="page-next"
+                    label="▶"
+                    plain
+                    onPress={() => update($, page, () => shownPage + 1)}
+                  />
+                  {tipsOn && (
+                    <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                      <Text inverse>{` Next page `}</Text>
+                    </Box>
+                  )}
+                </Box>
               )}
             </Box>
           )}
@@ -1423,44 +1520,72 @@ export const register: Register = (on, options) => {
                 >
                   <Box key="table-head" flexDirection="row">
                     <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
-                      <Button
-                        key="tick-all"
-                        label={tick(view.every(n => ticked.includes(n)))}
-                        plain
-                        onPress={() => toggleAll($, view)}
-                      />
+                      <Box key="tip:tick-all">
+                        <Button
+                          key="tick-all"
+                          label={tick(view.every(n => ticked.includes(n)))}
+                          plain
+                          onPress={() => toggleAll($, view)}
+                        />
+                        {tipsOn && (
+                          <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                            <Text inverse>{` Tick or untick all items shown, on all pages `}</Text>
+                          </Box>
+                        )}
+                      </Box>
                     </Box>
                     {lines && <Text dimColor>│</Text>}
                     <Box width={nameWidth + 2} paddingX={1}>
-                      <Button
-                        key="sort-name"
-                        label={`Name${arrow('name')}`}
-                        plain
-                        dimColor
-                        onPress={() => sortOn($, 'name')}
-                      />
+                      <Box key="tip:sort-name">
+                        <Button
+                          key="sort-name"
+                          label={`Name${arrow('name')}`}
+                          plain
+                          dimColor
+                          onPress={() => sortOn($, 'name')}
+                        />
+                        {tipsOn && (
+                          <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                            <Text inverse>{` Sort by name; click again to reverse `}</Text>
+                          </Box>
+                        )}
+                      </Box>
                     </Box>
                     {showFolder && lines && <Text dimColor>│</Text>}
                     {showFolder && (
                       <Box width={folderWidth + 2} paddingX={1}>
-                        <Button
-                          key="sort-folder"
-                          label={`Folder${arrow('folder')}`}
-                          plain
-                          dimColor
-                          onPress={() => sortOn($, 'folder')}
-                        />
+                        <Box key="tip:sort-folder">
+                          <Button
+                            key="sort-folder"
+                            label={`Folder${arrow('folder')}`}
+                            plain
+                            dimColor
+                            onPress={() => sortOn($, 'folder')}
+                          />
+                          {tipsOn && (
+                            <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                              <Text inverse>{` Sort by folder; click again to reverse `}</Text>
+                            </Box>
+                          )}
+                        </Box>
                       </Box>
                     )}
                     {lines && <Text dimColor>│</Text>}
                     <Box width={SIZE_WIDTH + 2} paddingX={1}>
-                      <Button
-                        key="sort-size"
-                        label={`Size${arrow('size')}`}
-                        plain
-                        dimColor
-                        onPress={() => sortOn($, 'size')}
-                      />
+                      <Box key="tip:sort-size">
+                        <Button
+                          key="sort-size"
+                          label={`Size${arrow('size')}`}
+                          plain
+                          dimColor
+                          onPress={() => sortOn($, 'size')}
+                        />
+                        {tipsOn && (
+                          <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                            <Text inverse>{` Sort by size; click again to reverse `}</Text>
+                          </Box>
+                        )}
+                      </Box>
                     </Box>
                     {lines && <Text dimColor>│</Text>}
                     <Box width={ACTIONS_WIDTH + 2} paddingX={1}>
@@ -1576,41 +1701,76 @@ export const register: Register = (on, options) => {
                           flexDirection="row"
                           gap={lines ? 1 : 0}
                         >
-                          <Button
-                            key={`open:${name}`}
-                            label="↗️ Open"
-                            plain
-                            dimColor
-                            onPress={() => openWithDefaultApp($, name)}
-                          />
-                          <Button
-                            key={`show:${name}`}
-                            label="📌 Finder"
-                            plain
-                            dimColor
-                            onPress={() => showInFinder($, name)}
-                          />
-                          <Button
-                            key={`mention:${name}`}
-                            label="💬 Ask"
-                            plain
-                            dimColor
-                            onPress={() => mention($, [name])}
-                          />
-                          <Button
-                            key={`rename:${name}`}
-                            label="📝 Ren"
-                            plain
-                            dimColor
-                            onPress={() => startRename($, name)}
-                          />
-                          <Button
-                            key={`copy:${name}`}
-                            label="📋 Copy"
-                            plain
-                            dimColor
-                            onPress={() => copyToClipboard($, [name])}
-                          />
+                          <Box key={`tip:open:${name}`}>
+                            <Button
+                              key={`open:${name}`}
+                              label="↗️ Open"
+                              plain
+                              dimColor
+                              onPress={() => openWithDefaultApp($, name)}
+                            />
+                            {tipsOn && (
+                              <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                                <Text inverse>{` Open with its default app, a folder in Finder `}</Text>
+                              </Box>
+                            )}
+                          </Box>
+                          <Box key={`tip:show:${name}`}>
+                            <Button
+                              key={`show:${name}`}
+                              label="📌 Finder"
+                              plain
+                              dimColor
+                              onPress={() => showInFinder($, name)}
+                            />
+                            {tipsOn && (
+                              <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                                <Text inverse>{` Show it selected in Finder `}</Text>
+                              </Box>
+                            )}
+                          </Box>
+                          <Box key={`tip:mention:${name}`}>
+                            <Button
+                              key={`mention:${name}`}
+                              label="💬 Ask"
+                              plain
+                              dimColor
+                              onPress={() => mention($, [name])}
+                            />
+                            {tipsOn && (
+                              <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                                <Text inverse>{` Put @path into the prompt to ask Claude about it `}</Text>
+                              </Box>
+                            )}
+                          </Box>
+                          <Box key={`tip:rename:${name}`}>
+                            <Button
+                              key={`rename:${name}`}
+                              label="📝 Ren"
+                              plain
+                              dimColor
+                              onPress={() => startRename($, name)}
+                            />
+                            {tipsOn && (
+                              <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                                <Text inverse>{` Rename it in its folder `}</Text>
+                              </Box>
+                            )}
+                          </Box>
+                          <Box key={`tip:copy:${name}`}>
+                            <Button
+                              key={`copy:${name}`}
+                              label="📋 Copy"
+                              plain
+                              dimColor
+                              onPress={() => copyToClipboard($, [name])}
+                            />
+                            {tipsOn && (
+                              <Box position="absolute" top={-1} right={0} display="none" hover={{ display: 'flex' }}>
+                                <Text inverse>{` Put it on the clipboard as a file (Cmd+V in Finder) `}</Text>
+                              </Box>
+                            )}
+                          </Box>
                         </Box>
                       </Box>
                     ),
@@ -1622,13 +1782,34 @@ export const register: Register = (on, options) => {
               {ticked.length > 0 && !confirming && (
                 <Box flexDirection="row" gap={1} alignItems="center">
                   <Text dimColor>{`${ticked.length} selected:`}</Text>
-                  <Button
-                    key="delete-selected"
-                    label="❌ Delete"
-                    onPress={() => update($, isConfirming, () => true)}
-                  />
-                  <Button key="mention-selected" label="💬 Ask" onPress={() => mention($, ticked)} />
-                  <Button key="copy-selected" label="📋 Copy" onPress={() => copyToClipboard($, ticked)} />
+                  <Box key="tip:delete-selected">
+                    <Button
+                      key="delete-selected"
+                      label="❌ Delete"
+                      onPress={() => update($, isConfirming, () => true)}
+                    />
+                    {tipsOn && (
+                      <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                        <Text inverse>{` Move the ticked items to the Trash `}</Text>
+                      </Box>
+                    )}
+                  </Box>
+                  <Box key="tip:mention-selected">
+                    <Button key="mention-selected" label="💬 Ask" onPress={() => mention($, ticked)} />
+                    {tipsOn && (
+                      <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                        <Text inverse>{` Put the ticked items into the prompt `}</Text>
+                      </Box>
+                    )}
+                  </Box>
+                  <Box key="tip:copy-selected">
+                    <Button key="copy-selected" label="📋 Copy" onPress={() => copyToClipboard($, ticked)} />
+                    {tipsOn && (
+                      <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                        <Text inverse>{` Put the ticked items on the clipboard as files `}</Text>
+                      </Box>
+                    )}
+                  </Box>
                 </Box>
               )}
               {confirming && (
@@ -1658,16 +1839,29 @@ export const register: Register = (on, options) => {
           <Box width={labelWidth}>
             <Text>💡 Finder:</Text>
           </Box>
-          <Box flexGrow={1} flexShrink={1}>
+          {/* A keyed Box: with tips on, pointing at the short tip explains it. */}
+          <Box key="tip:finder-tip" flexShrink={1}>
             <Text dimColor wrap="wrap">
               {e.surface === 'terminal'
                 ? `Drag into Src > 📥 Add or ${FINDER_TIP}`
                 : FINDER_TIP}
             </Text>
+            {tipsOn && (
+              <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` ${FINDER_TIP_LONG} `}</Text>
+              </Box>
+            )}
           </Box>
+          {/* The help switch, right after the tip: sleeping 💤 while the buttons'
+              tips are off, green ✅ while they show. */}
+          <Text dimColor>·</Text>
+          <Button key="tips" label={tipsOn ? '✅ Tips' : '💤 Tips'} plain dimColor={!tipsOn} onPress={() => toggleTips($)} />
+          {/* Pushes the clock to the right end. */}
+          <Box flexGrow={1} />
           {/* One Text, so the row's gap does not widen the space before the dot. */}
           {(clock !== null || e.surface === 'desktop') && (
-            <Text dimColor>
+            // Never wrapped: the clock and the version stay on one line.
+            <Text dimColor wrap="truncate">
               {clock ?? ''}
               {e.surface === 'desktop' && clock !== null && ' · '}
               {e.surface === 'desktop' && (

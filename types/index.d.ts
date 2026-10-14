@@ -30,6 +30,7 @@ declare module 'claude-code' {
       last: CopyResult | null
       pending: Pending | null
       isHidden: boolean
+      tipsOn: boolean
       isListOpen: boolean
       entries: string[]
       sizes: { [name: string]: number }

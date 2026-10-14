@@ -1244,7 +1244,7 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
 test('the Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
-  const tip = 'Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add'
+  const tip = '⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add'
 
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
   expect(await desktop.find({ type: 'Text', text: '💡 Finder:' })).toBeDefined()
@@ -1455,4 +1455,62 @@ test('Clear goes back to page 1', async ($, on) => {
   await ui.press({ key: 'clear-filter' })
   expect(await ui.find({ type: 'Text', text: '1/3 (#10)' })).toBeDefined()
   await ui.unmount()
+})
+
+test('the Tips switch turns the buttons\' help tips on and off, and is remembered', async ($, on) => {
+  mock.store(on)
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf'] : undefined))
+  on('session.start', () => ({ cwd: '/proj' }))
+
+  const tips = [
+    ' Pick files to copy into the target ',
+    ' Copy here the newest item of ~/Downloads ',
+    ' Open the target folder in Finder ',
+    ' Create a folder in the target and open it ',
+    ' Sort by size; click again to reverse ',
+    ' Put @path into the prompt to ask Claude about it ',
+    ' Put the ticked items on the clipboard as files ',
+    ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📥 Paste, or copy their paths with Option+Command+C, paste them into Src and press 📥 Add ',
+  ]
+  const shown = async (ui: { find: (q: object) => Promise<{ props: { inverse?: unknown } } | undefined> }) => {
+    const found = await Promise.all(tips.map(text => ui.find({ type: 'Text', text })))
+    return found.map(t => t?.props.inverse === true)
+  }
+
+  await $.session.start({ cwd: '/proj', surface: 'terminal', isInteractive: true })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    await ui.press({ key: 'list' })
+    await ui.press({ key: 'tick:a.pdf' })
+
+    // Off at first: no tips, and the button keeps its key in its box.
+    expect((await ui.find({ key: 'tips' }))?.props.label).toBe('💤 Tips')
+    expect(await shown(ui)).toEqual(tips.map(() => false))
+    expect(await ui.find({ key: 'tip:pick' })).toBeDefined()
+    expect(await ui.find({ key: 'pick' })).toBeDefined()
+
+    // On: every tip is there, revealed while the pointer is over its button.
+    await ui.press({ key: 'tips' })
+    expect((await ui.find({ key: 'tips' }))?.props.label).toBe('✅ Tips')
+    expect(await shown(ui)).toEqual(tips.map(() => true))
+
+    // Off again.
+    await ui.press({ key: 'tips' })
+    expect(await shown(ui)).toEqual(tips.map(() => false))
+    await ui.press({ key: 'tick:a.pdf' })
+    await ui.press({ key: 'list' })
+    await ui.unmount()
+  }
+
+  // The choice stays for the next session.
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  await ui.press({ key: 'tips' })
+  await ui.unmount()
+  await $.session.start({ cwd: '/proj', surface: 'desktop', isInteractive: true })
+  const next = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  expect((await next.find({ key: 'tips' }))?.props.label).toBe('✅ Tips')
+  await next.unmount()
 })

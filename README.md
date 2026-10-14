@@ -14,7 +14,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy│
 └────────────────────────────────────────────────────────────────────────────┘
 1 selected:  ❌ Delete  💬 Ask  📋 Copy
-💡 Finder:  Cmd+C > 📥 Paste or Opt+Cmd+C > Cmd+V in Src > 📥 Add   13.10.2026 14:32 CEST · v1.13.6
+💡 Finder:  ⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add · 💤 Tips   13.10.2026 14:32 CEST · v1.13.6
 ✅ Copied:  report.pdf                          [❌ Delete] [🙈 Hide]
 ```
 
@@ -77,6 +77,8 @@ The mod is for macOS only, because it uses these macOS commands:
 Listing folders, file sizes, name checks, 🧲 Download and the search outside git use Claude Code's own file access, not commands.
 
 ## What it does
+
+Click **💤 Tips** in the 💡 Finder row to turn on help tips; it turns green (**✅ Tips**) while they are on. Then point at a button to see a short help text above or below it. The tips appear at once (the app offers no delay), so they are off by default. The mod remembers your choice. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
 ### Copy files and folders
 
