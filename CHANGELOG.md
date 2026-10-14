@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.17.2
+
+- Fewer tips: only 📥 Paste, 🧲 Download and the 💡 Finder tip show a help text, always on. The 💤 Tips switch is gone, and moving the pointer across the table no longer shows tips.
+- 📌 Finder is now 📌 Locate, on the Target row and in each table row.
+
 ## 1.17.1
 
 - Fainter row stripes, now on both surfaces. The desktop uses a see-through gray that works in light and dark mode, and still lights up the row under the pointer.
