@@ -182,9 +182,15 @@ const pickScript = (kind: PickKind): string[] => [
 // Where the version links to: the README on GitHub. On the desktop only.
 const HELP_URL = 'https://github.com/olafrv/file-copy-macos#readme'
 
-// The background that tells table rows apart: a theme key, so it follows the
-// person's light or dark theme.
-const ROW_COLOR = 'subtle'
+// The backgrounds that tell table rows apart. Terminal: the theme's faint
+// background behind the person's own messages (a theme key, so it follows
+// the light or dark theme). Desktop: that key is drawn almost black there,
+// but the desktop draws colors with transparency, so a mid gray at 12% (a
+// stripe) and 22% (the row under the pointer) lightens a dark background and
+// darkens a light one alike.
+const ROW_STRIPE = 'userMessageBackground'
+const DESKTOP_STRIPE = '#8080801f'
+const DESKTOP_HOVER = '#80808038'
 
 // The file list's columns, in terminal cells: the tick box, the size
 // ("999 KB"), the actions ("↗️ Open 📌 Finder 💬 Ask 📝 Ren 📋 Copy") and the least
@@ -1626,7 +1632,6 @@ export const register: Register = (on, options) => {
                           key="sort-name"
                           label={`Name${arrow('name')}`}
                           plain
-                          dimColor
                           onPress={() => sortOn($, 'name')}
                         />
                         {tipsOn && (
@@ -1644,7 +1649,6 @@ export const register: Register = (on, options) => {
                             key="sort-folder"
                             label={`Folder${arrow('folder')}`}
                             plain
-                            dimColor
                             onPress={() => sortOn($, 'folder')}
                           />
                           {tipsOn && (
@@ -1662,7 +1666,6 @@ export const register: Register = (on, options) => {
                           key="sort-size"
                           label={`Size${arrow('size')}`}
                           plain
-                          dimColor
                           onPress={() => sortOn($, 'size')}
                         />
                         {tipsOn && (
@@ -1674,7 +1677,7 @@ export const register: Register = (on, options) => {
                     </Box>
                     {lines && <Text dimColor>│</Text>}
                     <Box width={ACTIONS_WIDTH + 2} paddingX={1}>
-                      <Text dimColor>Actions</Text>
+                      <Text bold>Actions</Text>
                     </Box>
                   </Box>
                   {lines && (
@@ -1717,8 +1720,10 @@ export const register: Register = (on, options) => {
                       <Box
                         key={`row:${name}`}
                         flexDirection="row"
-                        backgroundColor={lines && index % 2 === 1 ? ROW_COLOR : undefined}
-                        hover={lines ? undefined : { backgroundColor: ROW_COLOR }}
+                        backgroundColor={
+                          index % 2 === 1 ? (lines ? ROW_STRIPE : DESKTOP_STRIPE) : undefined
+                        }
+                        hover={lines ? undefined : { backgroundColor: DESKTOP_HOVER }}
                       >
                         <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
                           <Button
@@ -1953,14 +1958,17 @@ export const register: Register = (on, options) => {
           <Box flexGrow={1} />
           {/* One Text, so the row's gap does not widen the space before the dot. */}
           {(clock !== null || e.surface === 'desktop') && (
-            // Never wrapped: the clock and the version stay on one line.
-            <Text dimColor wrap="truncate">
-              {clock ?? ''}
-              {e.surface === 'desktop' && clock !== null && ' · '}
-              {e.surface === 'desktop' && (
-                <Link href={HELP_URL}>{modVersion === null ? 'Help' : `v${modVersion}`}</Link>
-              )}
-            </Text>
+            // Never wrapped or cut: the clock and the version keep their room;
+            // the tip wraps instead.
+            <Box flexShrink={0}>
+              <Text dimColor wrap="truncate">
+                {clock ?? ''}
+                {e.surface === 'desktop' && clock !== null && ' · '}
+                {e.surface === 'desktop' && (
+                  <Link href={HELP_URL}>{modVersion === null ? 'Help' : `v${modVersion}`}</Link>
+                )}
+              </Text>
+            </Box>
           )}
         </Box>
         {ask !== null && (
