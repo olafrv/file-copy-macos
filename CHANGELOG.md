@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.1
+
+- The 🎯 Target path starts at the project folder (`…/demo / docs`). Point at it to see the full path.
+- Fixed: in the terminal, a long Target path could push 📌 Locate off the row, because the bracketed buttons are wider than counted.
+- README: a real screenshot of the bar replaces the hand-made text sketch. `scripts/demo-project.sh` creates a neutral sample project for screenshots.
+
 ## 1.19.0
 
 - "📎 Src:" is "📎 Source:" again, and the 💡 Finder tip says "in Source".
