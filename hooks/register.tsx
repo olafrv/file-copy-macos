@@ -218,18 +218,27 @@ const clearFilter = async ($: EngineInterface) => {
   await endSearch($)
 }
 
-// Wide enough for "📚 Content:" (an icon is 2 columns), so the rows line up.
+// Below this many columns (the band's), a terminal draws short labels.
+const NARROW_COLUMNS = 100
+
+// The label column: wide enough for "📚 Content:" (an icon is 2 columns),
+// one cell less in the desktop's narrower font, and the icon alone in a
+// narrow terminal.
 const LABEL_WIDTH = 11
-// The desktop draws the labels in a narrower font: it needs one cell less.
 const DESKTOP_LABEL_WIDTH = 10
+const ICON_LABEL_WIDTH = 2
 
 // The two ways from Finder: files on the clipboard, or their paths as text.
 // The row's label says "Finder:".
-const FINDER_TIP = '⌘C > 📋 Paste or ⌥⌘C > ⌘V in Source > 🧲 Add'
+const FINDER_TIP = '⌥⌘C ⌘V into 📎 > 🧲 Add · ⌘C > 📋 Paste'
+// The terminal can also take files dragged into the 📎 field.
+const FINDER_TIP_TERMINAL = `Drag or ${FINDER_TIP}`
+// A narrow terminal: the same in icons, so the clock still fits the row.
+const FINDER_TIP_NARROW = 'Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋'
 // The same in words, shown while the pointer is over the short tip.
 const FINDER_TIP_LONG =
   '⌘ = Command, ⌥ = Option. Copy files in Finder and press 📋 Paste, or copy their ' +
-  'paths with Option+Command+C, paste them into Source and press 🧲 Add'
+  'paths with Option+Command+C, paste them into 📎 Source and press 🧲 Add'
 
 const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use 📄 Files or 🗂️ Folders.'
 
@@ -1227,7 +1236,13 @@ export const register: Register = (on, options) => {
     // Each column has a cell of padding on both sides (on the desktop, not the
     // tick box), the frame 2 sides, and in the terminal 3 "│" between them.
     const tickWidth = lines ? TICK_WIDTH : DESKTOP_TICK_WIDTH
-    const labelWidth = lines ? LABEL_WIDTH : DESKTOP_LABEL_WIDTH
+    // A narrow terminal (the standard 80 columns leave about 75): the rows'
+    // labels and the Source and Content buttons shorten to their icons, so
+    // each row stays on one line. 🧲🖥️ and 🧲⬇️ keep Desktop and Download
+    // apart; 👻 .files shows its state by brightness.
+    const narrow = lines && e.props.bodyColumns < NARROW_COLUMNS
+    const labelWidth = narrow ? ICON_LABEL_WIDTH : lines ? LABEL_WIDTH : DESKTOP_LABEL_WIDTH
+    const label = (icon: string, word: string) => (narrow ? icon : `${icon} ${word}:`)
     // The Target path: what is left of the row after the label and the two
     // buttons (with their padding on the desktop).
     const pathParts = [baseName(root), ...(dir === '' ? [] : dir.split('/'))]
@@ -1276,7 +1291,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1} alignItems="center">
           <Box width={labelWidth}>
-            <Text>📎 Source:</Text>
+            <Text>{label('📎', 'Source')}</Text>
           </Box>
           <Box flexGrow={1}>
             <Input
@@ -1327,18 +1342,18 @@ export const register: Register = (on, options) => {
           )}
           <Button
             key="pick"
-            label="📄 Files"
+            label={narrow ? '📄' : '📄 Files'}
             onPress={() => pickAndCopy($, 'files')}
           />
           <Button
             key="pick-folder"
-            label="🗂️ Folders"
+            label={narrow ? '🗂️' : '🗂️ Folders'}
             onPress={() => pickAndCopy($, 'folders')}
           />
           <Box key="tip:paste-files">
             <Button
               key="paste-files"
-              label="📋 Paste"
+              label={narrow ? '📋' : '📋 Paste'}
               onPress={() => pasteFromClipboard($)}
             />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
@@ -1346,7 +1361,7 @@ export const register: Register = (on, options) => {
             </Box>
           </Box>
           <Box key="tip:latest-desktop">
-            <Button key="latest-desktop" label="🧲 Desktop" onPress={() => copyNewestFrom($, 'Desktop')} />
+            <Button key="latest-desktop" label={narrow ? '🧲🖥️' : '🧲 Desktop'} onPress={() => copyNewestFrom($, 'Desktop')} />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
               <Text inverse>{` Copy here the newest item of ~/Desktop, for example a screenshot `}</Text>
             </Box>
@@ -1354,7 +1369,7 @@ export const register: Register = (on, options) => {
           <Box key="tip:latest-download">
             <Button
               key="latest-download"
-              label="🧲 Download"
+              label={narrow ? '🧲⬇️' : '🧲 Download'}
               onPress={() => copyNewestFrom($, 'Downloads')}
             />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
@@ -1385,7 +1400,7 @@ export const register: Register = (on, options) => {
         )}
         <Box flexDirection="row" gap={1} marginTop={rowSpace}>
           <Box width={labelWidth}>
-            <Text>🎯 Target:</Text>
+            <Text>{label('🎯', 'Target')}</Text>
           </Box>
           {/* The path: the part above the project as text, then one button per
               folder from the project down; a click makes it the target. */}
@@ -1419,32 +1434,32 @@ export const register: Register = (on, options) => {
         </Box>
         <Box flexDirection="row" gap={1} marginTop={rowSpace}>
           <Box width={labelWidth}>
-            <Text>📚 Content:</Text>
+            <Text>{label('📚', 'Content')}</Text>
           </Box>
           <Button
             key="list"
-            label={listOpen ? '🫣 Hide' : '👁️ Show'}
+            label={narrow ? (listOpen ? '🫣' : '👁️') : listOpen ? '🫣 Hide' : '👁️ Show'}
             plain
             onPress={() => toggleList($)}
           />
           {!naming && (
             <Button
               key="new-folder"
-              label="🗂️ New folder"
+              label={narrow ? '🗂️ New' : '🗂️ New folder'}
               plain
               onPress={() => update($, isNamingFolder, () => true)}
             />
           )}
           <Button
             key="dotfiles"
-            label={showDots ? '👻 Hide .files' : '👻 Show .files'}
+            label={narrow ? '👻 .files' : showDots ? '👻 Hide .files' : '👻 Show .files'}
             plain
             dimColor={!showDots}
             onPress={() => toggleDotfiles($)}
           />
           {/* The terminal draws the field as wide as its box; the desktop at its
               own width, so a fixed box there would push Clear away. */}
-          <Box width={lines ? 38 : undefined}>
+          <Box width={lines ? (narrow ? 26 : 38) : undefined}>
             <Input
               key={`filter-${await read($, filterId)}`}
               label="Filter"
@@ -1780,13 +1795,15 @@ export const register: Register = (on, options) => {
         )}
         <Box flexDirection="row" gap={1}>
           <Box width={labelWidth}>
-            <Text>💡 Finder:</Text>
+            <Text>{label('💡', 'Finder')}</Text>
           </Box>
           {/* A keyed Box: pointing at the short tip explains it in words. */}
           <Box key="tip:finder-tip" flexShrink={1}>
             <Text dimColor wrap="wrap">
               {e.surface === 'terminal'
-                ? `Drag into Source > 🧲 Add or ${FINDER_TIP}`
+                ? narrow
+                  ? FINDER_TIP_NARROW
+                  : FINDER_TIP_TERMINAL
                 : FINDER_TIP}
             </Text>
             <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
@@ -1796,15 +1813,19 @@ export const register: Register = (on, options) => {
           {/* Pushes the clock to the right end. */}
           <Box flexGrow={1} />
           {/* One Text, so the row's gap does not widen the space before the dot. */}
-          {(clock !== null || e.surface === 'desktop') && (
+          {(clock !== null || e.surface === 'desktop' || modVersion !== null) && (
             // Never wrapped or cut: the clock and the version keep their room;
             // the tip wraps instead.
             <Box flexShrink={0}>
               <Text dimColor wrap="truncate">
                 {clock ?? ''}
-                {e.surface === 'desktop' && clock !== null && ' · '}
-                {e.surface === 'desktop' && (
+                {(e.surface === 'desktop' || modVersion !== null) && clock !== null && ' · '}
+                {/* The desktop links the version to the README; the terminal
+                    shows it as plain text, as a link there did not show. */}
+                {e.surface === 'desktop' ? (
                   <Link href={HELP_URL}>{modVersion === null ? 'Help' : `v${modVersion}`}</Link>
+                ) : (
+                  modVersion !== null && `v${modVersion}`
                 )}
               </Text>
             </Box>
@@ -1813,7 +1834,7 @@ export const register: Register = (on, options) => {
         {ask !== null && (
           <Box flexDirection="row" gap={1}>
             <Box width={labelWidth}>
-              <Text color="yellow">⚠ Exists:</Text>
+              <Text color="yellow">{label('⚠', 'Exists')}</Text>
             </Box>
             <Box flexDirection="column" flexGrow={1} flexShrink={1}>
               <Text color="yellow" wrap="wrap">
@@ -1831,7 +1852,7 @@ export const register: Register = (on, options) => {
         {showResult && result.copied.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
             <Box width={labelWidth}>
-              <Text color="green">✅ Copied:</Text>
+              <Text color="green">{label('✅', 'Copied')}</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
               <Text wrap="wrap">{result.copied.join(', ')}</Text>
@@ -1878,7 +1899,7 @@ export const register: Register = (on, options) => {
         {showResult && result.skipped.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
             <Box width={labelWidth}>
-              <Text dimColor>⏭️ Skipped:</Text>
+              <Text dimColor>{label('⏭️', 'Skipped')}</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
               <Text dimColor wrap="wrap">{result.skipped.join(', ')}</Text>
@@ -1891,7 +1912,7 @@ export const register: Register = (on, options) => {
         {showResult && result.failed.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
             <Box width={labelWidth}>
-              <Text color="yellow">⚠ Failed:</Text>
+              <Text color="yellow">{label('⚠', 'Failed')}</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
               <Text wrap="wrap">{result.failed.join(', ')}</Text>

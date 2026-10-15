@@ -81,6 +81,8 @@ Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Download and the se
 
 ## What it does
 
+The rows of the bar are 📎 Source, 🎯 Target, 📚 Content and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and the 📎 Source and 📚 Content buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, 🧲🖥️ Desktop, 🧲⬇️ Download, 🫣 Hide, 🗂️ New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
+
 Point at 📋 Paste, 🧲 Desktop, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
 ### Copy files and folders
@@ -136,7 +138,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Clock
 
-The Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. On the desktop, the version of the mod follows the clock after a middle dot. It is a link to this README.
+The Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. The version of the mod follows the clock after a middle dot. On the desktop it is a link to this README.
 
 ### What Claude is told
 

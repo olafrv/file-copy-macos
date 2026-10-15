@@ -1087,7 +1087,7 @@ test('the clock reads the zone from macOS and shows date, time and zone', async 
   expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('31.12.2025 21:00 EST')
 })
 
-test('the Finder row shows the clock on both surfaces, the version on the desktop', async ($, on) => {
+test('the Finder row shows the clock and the version on both surfaces', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('clock.now', () => ({ value: Date.UTC(2026, 9, 13, 12, 32, 15) }))
   on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/date' ? '+0200 CEST\n' : '') }))
@@ -1105,8 +1105,11 @@ test('the Finder row shows the clock on both surfaces, the version on the deskto
     expect(version?.children).toEqual(surface === 'desktop' ? ['v9.8.7'] : undefined)
     const clock = await ui.find({ type: 'Text', text: '13.10.2026 14:32 CEST' })
     const parts = (clock?.children ?? []).filter(c => typeof c === 'string')
+    // The terminal shows the version as plain text after the dot.
     expect(parts).toEqual(
-      surface === 'desktop' ? ['13.10.2026 14:32 CEST', ' · '] : ['13.10.2026 14:32 CEST'],
+      surface === 'desktop'
+        ? ['13.10.2026 14:32 CEST', ' · ']
+        : ['13.10.2026 14:32 CEST', ' · ', 'v9.8.7'],
     )
     await ui.unmount()
   }
@@ -1261,7 +1264,7 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
 test('the Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
-  const tip = '⌘C > 📋 Paste or ⌥⌘C > ⌘V in Source > 🧲 Add'
+  const tip = '⌥⌘C ⌘V into 📎 > 🧲 Add · ⌘C > 📋 Paste'
 
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
   expect(await desktop.find({ type: 'Text', text: '💡 Finder:' })).toBeDefined()
@@ -1269,7 +1272,7 @@ test('the Finder row names both ways from Finder; the terminal also names drag',
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
-  expect(await terminal.find({ type: 'Text', text: `Drag into Source > 🧲 Add or ${tip}` })).toBeDefined()
+  expect(await terminal.find({ type: 'Text', text: `Drag or ${tip}` })).toBeDefined()
   await terminal.unmount()
 })
 
@@ -1483,7 +1486,7 @@ test('only the buttons whose label does not say enough carry a help tip', async 
     ' Copy here the files you copied in Finder with Cmd+C ',
     ' Copy here the newest item of ~/Downloads ',
     ' Copy here the newest item of ~/Desktop, for example a screenshot ',
-    ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📋 Paste, or copy their paths with Option+Command+C, paste them into Source and press 🧲 Add ',
+    ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📋 Paste, or copy their paths with Option+Command+C, paste them into 📎 Source and press 🧲 Add ',
   ]
   const gone = [
     ' Show the target folder selected in its parent folder ',
@@ -1531,9 +1534,9 @@ test('a long Target path is shortened: first the text above the project, then th
   // The desktop's padding per button counts too: here three folders still fit.
   expect(fitCrumbs(above, parts, 40, 2)).toEqual({ above: '…/', crumbs: [0, 'gap', 2, 3, 4] })
 
-  // In the band: a terminal of 68 columns, four folders deep, leaves 29 cells
-  // for the path (less the label and the two buttons): the project, "…",
-  // then q3 and reports.
+  // In the band: a terminal of 59 columns, four folders deep, leaves 29 cells
+  // for the path (less the label icon and the two buttons): the project,
+  // "…", then q3 and reports.
   const tree: Record<string, string[]> = {
     '/Users/me/Documents/Claude/Code/my-project': ['docs/'],
     '/Users/me/Documents/Claude/Code/my-project/docs': ['2026/'],
@@ -1548,7 +1551,7 @@ test('a long Target path is shortened: first the text above the project, then th
     plugin: 'file-copy-macos',
     surface: 'terminal',
     ...BAND,
-    props: { ...BAND.props, bodyColumns: 68 },
+    props: { ...BAND.props, bodyColumns: 59 },
   })
   await ui.press({ key: 'list' })
 
@@ -1706,4 +1709,63 @@ test('rows are told apart: stripes on both surfaces, and a hover light on the de
   expect(inTree(await desktop.drawn(), 'row:b.txt')?.hover).toEqual({ backgroundColor: '#80808038' })
   await desktop.press({ key: 'list' })
   await desktop.unmount()
+})
+
+test('a standard 80×24 terminal gets short labels, so each row fits', async ($, on) => {
+  const names = Array.from({ length: 7 }, (_, i) => `f${i + 1}.txt`)
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? names : undefined))
+
+  // Cells a label takes in a terminal: an emoji 2, a variation selector 0.
+  const cells = (text: string) =>
+    [...text].reduce((sum, c) => sum + (/️/.test(c) ? 0 : /\p{Extended_Pictographic}/u.test(c) ? 2 : 1), 0)
+  const labelOf = async (ui: { find: (q: object) => Promise<{ props: { label?: unknown } } | undefined> }, key: string) =>
+    String((await ui.find({ key }))?.props.label ?? '')
+
+  // 80 columns leave 75 for the band; 24 rows leave it about 12.
+  const ui = await $.ui.mount({
+    plugin: 'file-copy-macos',
+    surface: 'terminal',
+    ...BAND,
+    props: { ...BAND.props, bodyColumns: 75, maxRows: 12 },
+  })
+  await ui.press({ key: 'list' })
+
+  const source = ['pick', 'pick-folder', 'paste-files', 'latest-desktop', 'latest-download']
+  expect(await Promise.all(source.map(key => labelOf(ui, key)))).toEqual(['📄', '🗂️', '📋', '🧲🖥️', '🧲⬇️'])
+  expect(await labelOf(ui, 'list')).toBe('🫣')
+  expect(await labelOf(ui, 'new-folder')).toBe('🗂️ New')
+  expect(await labelOf(ui, 'dotfiles')).toBe('👻 .files')
+  // The rows' labels show their icons alone.
+  expect(await ui.find({ type: 'Text', text: '📚' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '📚 Content:' })).toBeUndefined()
+
+  // Source row: the icon label, then the field (at least 20 cells for
+  // "Paste paths (↵ add)" and its Add), then the buttons in brackets.
+  const buttons = await Promise.all(source.map(async key => cells(await labelOf(ui, key)) + 4))
+  const sourceRow = 2 + 1 + 20 + buttons.reduce((sum, w) => sum + w + 1, 0)
+  expect(sourceRow).toBeLessThanOrEqual(75)
+
+  // Content row: the icon label, Hide, New folder, .files, the filter box
+  // (26), Clear and the page control "◀ 1/2 (#7) ▶".
+  const plain = await Promise.all(['list', 'new-folder', 'dotfiles'].map(async key => cells(await labelOf(ui, key))))
+  const contentRow = 2 + 1 + plain.reduce((sum, w) => sum + w + 1, 0) + 26 + 1 + 8 + 1 + cells('◀ 1/2 (#7) ▶')
+  expect(contentRow).toBeLessThanOrEqual(75)
+  // The page holds 4 items in 12 rows.
+  expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
+
+  // Finder row: the icon label, the short tip, then the clock and version.
+  const tip = 'Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋'
+  expect(await ui.find({ type: 'Text', text: tip })).toBeDefined()
+  const finderRow = 2 + 1 + cells(tip) + 1 + cells('16.10.2026 01:18 CEST · v1.19.1')
+  expect(finderRow).toBeLessThanOrEqual(75)
+  await ui.unmount()
+
+  // A wide terminal keeps the words.
+  const wide = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND, props: { ...BAND.props, bodyColumns: 115 } })
+  expect(await labelOf(wide, 'latest-download')).toBe('🧲 Download')
+  expect(await labelOf(wide, 'list')).toBe('🫣 Hide')
+  expect(await wide.find({ type: 'Text', text: '📚 Content:' })).toBeDefined()
+  await wide.unmount()
 })
