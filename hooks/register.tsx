@@ -225,13 +225,13 @@ const DESKTOP_LABEL_WIDTH = 10
 
 // The two ways from Finder: files on the clipboard, or their paths as text.
 // The row's label says "Finder:".
-const FINDER_TIP = '⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add'
+const FINDER_TIP = '⌘C > 📋 Paste or ⌥⌘C > ⌘V in Source > 🧲 Add'
 // The same in words, shown while the pointer is over the short tip.
 const FINDER_TIP_LONG =
-  '⌘ = Command, ⌥ = Option. Copy files in Finder and press 📥 Paste, or copy their ' +
-  'paths with Option+Command+C, paste them into Src and press 📥 Add'
+  '⌘ = Command, ⌥ = Option. Copy files in Finder and press 📋 Paste, or copy their ' +
+  'paths with Option+Command+C, paste them into Source and press 🧲 Add'
 
-const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use 📄 Files or 📂 Folder.'
+const NO_PATH_HINT = 'No path yet. Paste one or more paths first, or use 📄 Files or 🗂️ Folders.'
 
 const shortPath = (path: string): string =>
   path.replace(/^\/Users\/[^/]+/, '~')
@@ -1130,7 +1130,7 @@ export const register: Register = (on, options) => {
     await update($, subdir, () => '')
     await endSearch($)
     await update($, isSearching, () => false)
-    // The content shows from the start; 🙈 Hide closes it for this session.
+    // The content shows from the start; 🫣 Hide closes it for this session.
     await update($, selected, () => [])
     await update($, page, () => 0)
     await update($, isListOpen, () => true)
@@ -1192,7 +1192,7 @@ export const register: Register = (on, options) => {
     )
     const arrow = (key: SortKey) => (by === key ? (desc ? ' ▼' : ' ▲') : '')
     // Items per page: what the band's rows leave after its other rows. They
-    // are Src with its hint and pasted list; Target; Content with the New
+    // are Source with its hint and pasted list; Target; Content with the New
     // folder field and ⤴️ up; the table's frame, header and header line
     // (terminal); a search's note and "Searching..."; the selection row (kept
     // free, so ticking does not change the page); the Finder row, which may
@@ -1272,14 +1272,14 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1} alignItems="center">
           <Box width={labelWidth}>
-            <Text>📎 Src:</Text>
+            <Text>📎 Source:</Text>
           </Box>
           <Box flexGrow={1}>
             <Input
               key={`source-${await read($, fieldId)}`}
               value={startText === '' ? undefined : startText}
               placeholder={isBusy ? 'Copying...' : 'Paste paths (↵ add)'}
-              submitLabel="📥 Add"
+              submitLabel="🧲 Add"
               onInput={async (value: string) => {
                 await update($, draft, () => value)
                 await checkPastedDirs($, value)
@@ -1328,13 +1328,13 @@ export const register: Register = (on, options) => {
           />
           <Button
             key="pick-folder"
-            label="📂 Folder"
+            label="🗂️ Folders"
             onPress={() => pickAndCopy($, 'folders')}
           />
           <Box key="tip:paste-files">
             <Button
               key="paste-files"
-              label="📥 Paste"
+              label="📋 Paste"
               onPress={() => pasteFromClipboard($)}
             />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
@@ -1415,7 +1415,7 @@ export const register: Register = (on, options) => {
           </Box>
           <Button
             key="list"
-            label={listOpen ? '🙈 Hide' : '👀 Show'}
+            label={listOpen ? '🫣 Hide' : '👁️ Show'}
             plain
             onPress={() => toggleList($)}
           />
@@ -1778,7 +1778,7 @@ export const register: Register = (on, options) => {
           <Box key="tip:finder-tip" flexShrink={1}>
             <Text dimColor wrap="wrap">
               {e.surface === 'terminal'
-                ? `Drag into Src > 📥 Add or ${FINDER_TIP}`
+                ? `Drag into Source > 🧲 Add or ${FINDER_TIP}`
                 : FINDER_TIP}
             </Text>
             <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
@@ -1836,7 +1836,7 @@ export const register: Register = (on, options) => {
               />
             )}
             {!confirmingLast && hideOn === 'copied' && (
-              <Button key="hide" label="🙈 Hide" onPress={() => update($, isHidden, () => true)} />
+              <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
             )}
           </Box>
         )}
@@ -1876,7 +1876,7 @@ export const register: Register = (on, options) => {
               <Text dimColor wrap="wrap">{result.skipped.join(', ')}</Text>
             </Box>
             {!confirmingLast && hideOn === 'skipped' && (
-              <Button key="hide" label="🙈 Hide" onPress={() => update($, isHidden, () => true)} />
+              <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
             )}
           </Box>
         )}
@@ -1889,7 +1889,7 @@ export const register: Register = (on, options) => {
               <Text wrap="wrap">{result.failed.join(', ')}</Text>
             </Box>
             {!confirmingLast && (
-              <Button key="hide" label="🙈 Hide" onPress={() => update($, isHidden, () => true)} />
+              <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
             )}
           </Box>
         )}

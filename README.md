@@ -3,9 +3,9 @@
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
 ```
-📎 Src:     [Paste paths (↵ add)] 📥 Add   📄 Files  📂 Folder  📥 Paste  🧲 Desktop  🧲 Download
+📎 Source:  [Paste paths (↵ add)] 🧲 Add   📄 Files  🗂️ Folders  📋 Paste  🧲 Desktop  🧲 Download
 🎯 Target:  ~/Projects/my-app/docs   ↗️ Open  📌 Locate
-📚 Content: 🙈 Hide   🗂️ New folder   👻 Show .files   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
+📚 Content: 🫣 Hide   🗂️ New folder   👻 Show .files   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
 ⤴️ my-app/
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ ☐  │ Name ▲            │ Size    │ Actions                                │
@@ -14,8 +14,8 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Locate 💬 Ask 📝 Ren 📋 Copy│
 └────────────────────────────────────────────────────────────────────────────┘
 1 selected:  ❌ Delete  💬 Ask  📋 Copy
-💡 Finder:  ⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add   13.10.2026 14:32 CEST · v1.18.0
-✅ Copied:  report.pdf                          [❌ Delete] [🙈 Hide]
+💡 Finder:  ⌘C > 📋 Paste or ⌥⌘C > ⌘V in Source > 🧲 Add   13.10.2026 14:32 CEST · v1.18.0
+✅ Copied:  report.pdf                          [❌ Delete] [🫣 Hide]
 ```
 
 ## Install
@@ -87,7 +87,7 @@ The mod is for macOS only, because it uses these macOS commands:
 | `/bin/mkdir` | 🗂️ New folder |
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
 | `/usr/bin/open` | ↗️ Open and 📌 Locate |
-| `/usr/bin/osascript` | 📄 Files and 📂 Folder pickers, 📋 Copy and 📥 Paste (clipboard) |
+| `/usr/bin/osascript` | 📄 Files and 🗂️ Folders pickers, 📋 Copy and 📋 Paste (clipboard) |
 | `/bin/date` | The time zone of the clock |
 | `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
 
@@ -95,13 +95,13 @@ Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Download and the se
 
 ## What it does
 
-Point at 📥 Paste, 🧲 Desktop, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
+Point at 📋 Paste, 🧲 Desktop, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
 ### Copy files and folders
 
-- **Paste paths** into the field and press Enter (or **📥 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
-- **📄 Files** and **📂 Folder** open the macOS picker. You can select several items.
-- **📥 Paste** adds the files and folders you copied in Finder with Cmd+C. Text on the clipboard is ignored.
+- **Paste paths** into the field and press Enter (or **🧲 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
+- **📄 Files** and **🗂️ Folders** open the macOS picker. You can select several items: hold Cmd and click each one.
+- **📋 Paste** adds the files and folders you copied in Finder with Cmd+C. Text on the clipboard is ignored.
 - **🧲 Desktop** copies the newest file or folder on your Desktop, for example the screenshot you just took.
 - **🧲 Download** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
@@ -121,13 +121,13 @@ If a name already exists in the target, the mod asks first:
 ### Target and contents
 
 - **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. A long path is shortened to fit: first the part above the project becomes "…/", then the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected.
-- **📚 Content** shows when a session starts; **🙈 Hide** closes it and **👀 Show** opens it again.
+- **📚 Content** shows when a session starts; **🫣 Hide** closes it and **👁️ Show** opens it again.
 - **📚 Content** is a framed table with the columns tick box, Name, Size and Actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - **🗂️ New folder** creates a folder in the target and opens it.
 - Names that start with "." (for example `.env` or `.claude`) are hidden, as in Finder. **👻 Show .files** shows them, in the list and in search results; **👻 Hide .files** hides them again. The mod remembers your choice.
-- **Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🙈 Hide**.
+- **Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🫣 Hide**.
 - **🔍 Find** (or Enter) searches the target folder and all folders below it. The table then gets a **Folder** column with each item's folder. Point at a folder there to see its full path; a click opens it. All actions work on the items found, and 📝 Ren keeps an item in its own folder. Typing in the filter again, 🧹 Clear or opening a folder ends the search.
   - In a git project, the search follows `.gitignore`: ignored files are not found. To skip a folder only on your Mac, add it to `.git/info/exclude`.
   - The setting **Search: skip folders** (see [Settings](#settings)) lists folder names the search always skips. The default is `.git, .svn, .hg, node_modules, bower_components`. Add others, for example `.venv` or `dist`.

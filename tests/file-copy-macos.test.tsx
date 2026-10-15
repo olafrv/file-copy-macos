@@ -537,7 +537,7 @@ test('Copy only new shows the kept files as Skipped, not as Failed', async ($, o
   await ui.unmount()
 })
 
-test('Folder opens the folder picker and copies the folders', async ($, on) => {
+test('Folders opens the folder picker and copies the folders', async ($, on) => {
   mock.clock(on, { now: 100_000 })
   const scripts: string[] = []
   const copies: (readonly string[])[] = []
@@ -1004,7 +1004,7 @@ test('Content sorts by a header click and filters by name', async ($, on) => {
     expect(await ui.find({ key: 'sort-name' })).toBeUndefined()
     await ui.input({ key: `filter-${fieldId}`, text: 'big', kind: 'change' })
     expect(await rows(ui)).toEqual(['big.zip'])
-    expect((await ui.find({ key: 'list' }))?.props.label).toBe('🙈 Hide')
+    expect((await ui.find({ key: 'list' }))?.props.label).toBe('🫣 Hide')
 
     await ui.press({ key: 'list' })
     fieldId += 1
@@ -1244,8 +1244,8 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
     copies.length = 0
     clipboard = '/Users/me/Desktop/My File.pdf\n/Users/me/Desktop/photos\n'
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect((await ui.find({ key: 'paste-files' }))?.props.label).toBe('📥 Paste')
-    expect((await ui.find({ key: 'source-0' }))?.props.submitLabel).toBe('📥 Add')
+    expect((await ui.find({ key: 'paste-files' }))?.props.label).toBe('📋 Paste')
+    expect((await ui.find({ key: 'source-0' }))?.props.submitLabel).toBe('🧲 Add')
 
     await ui.press({ key: 'paste-files' })
     expect(copies).toEqual([['/Users/me/Desktop/My File.pdf', '/Users/me/Desktop/photos']])
@@ -1261,7 +1261,7 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
 test('the Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
-  const tip = '⌘C > 📥 Paste or ⌥⌘C > ⌘V in Src > 📥 Add'
+  const tip = '⌘C > 📋 Paste or ⌥⌘C > ⌘V in Source > 🧲 Add'
 
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
   expect(await desktop.find({ type: 'Text', text: '💡 Finder:' })).toBeDefined()
@@ -1269,7 +1269,7 @@ test('the Finder row names both ways from Finder; the terminal also names drag',
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
-  expect(await terminal.find({ type: 'Text', text: `Drag into Src > 📥 Add or ${tip}` })).toBeDefined()
+  expect(await terminal.find({ type: 'Text', text: `Drag into Source > 🧲 Add or ${tip}` })).toBeDefined()
   await terminal.unmount()
 })
 
@@ -1483,7 +1483,7 @@ test('only the buttons whose label does not say enough carry a help tip', async 
     ' Copy here the files you copied in Finder with Cmd+C ',
     ' Copy here the newest item of ~/Downloads ',
     ' Copy here the newest item of ~/Desktop, for example a screenshot ',
-    ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📥 Paste, or copy their paths with Option+Command+C, paste them into Src and press 📥 Add ',
+    ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📋 Paste, or copy their paths with Option+Command+C, paste them into Source and press 🧲 Add ',
   ]
   const gone = [
     ' Show the target folder selected in its parent folder ',
@@ -1578,7 +1578,7 @@ test('a page shows as many items as the band has rows for: 4 to 10', async ($, o
   on('process.run', () => ({ value: ran('') }))
   fakeFs(on, dir => (dir === '/proj' ? names : undefined))
 
-  // In the terminal the list view itself takes 10 rows: Src, Target,
+  // In the terminal the list view itself takes 10 rows: Source, Target,
   // Content, the table's frame, header and header line, the selection row
   // and the Finder row with room to wrap.
   for (const [maxRows, perPage, pages] of [
@@ -1629,7 +1629,7 @@ test('hidden names are hidden as in Finder, until the switch shows them', async 
   const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
 
   // A session starts with the content shown.
-  expect((await ui.find({ key: 'list' }))?.props.label).toBe('🙈 Hide')
+  expect((await ui.find({ key: 'list' }))?.props.label).toBe('🫣 Hide')
 
   // Hidden at first.
   expect((await ui.find({ key: 'dotfiles' }))?.props.label).toBe('👻 Show .files')
