@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.0
+
+- Narrow terminals (under 100 columns, including the standard 80×24): the row labels and the 📎 Source and 📚 Content buttons show only their icons (🧲🖥️ is Desktop, 🧲⬇️ is Download), and the 💡 tip becomes a short icon line, so the rows stay on one line.
+- The 💡 Finder tip groups the ways that end in 🧲 Add: "Drag or ⌥⌘C ⌘V into 📎 > 🧲 Add · ⌘C > 📋 Paste".
+- The terminal shows the version after the clock again.
+
 ## 1.19.1
 
 - The 🎯 Target path starts at the project folder (`…/demo / docs`). Point at it to see the full path.
