@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.1
+
+- README: screenshots of the bar in the desktop app and in a terminal.
+- README: a terminal needs at least 80 columns and 35 rows; in a shorter window the bar scrolls and hides the file list.
+- README: several descriptions brought up to date.
+
 ## 1.20.0
 
 - Narrow terminals (under 100 columns, including the standard 80×24): the row labels and the 📎 Source and 📚 Content buttons show only their icons (🧲🖥️ is Desktop, 🧲⬇️ is Download), and the 💡 tip becomes a short icon line, so the rows stay on one line.
