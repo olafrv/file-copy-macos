@@ -1,1 +1,3 @@
 .DS_Store
+# The sample project for the README screenshots (scripts/demo-project.sh).
+/demo/

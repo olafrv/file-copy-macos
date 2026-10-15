@@ -2,21 +2,7 @@
 
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
-```
-📎 Source:  [Paste paths (↵ add)] 🧲 Add   📄 Files  🗂️ Folders  📋 Paste  🧲 Desktop  🧲 Download
-🎯 Target:  ~/Projects/my-app/docs   ↗️ Open  📌 Locate
-📚 Content: 🫣 Hide   🗂️ New folder   👻 Show .files   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
-⤴️ my-app/
-┌────────────────────────────────────────────────────────────────────────────┐
-│ ☐  │ Name ▲            │ Size    │ Actions                                │
-│────┼───────────────────┼─────────┼────────────────────────────────────────│
-│ ☐  │ 📁 2026/          │         │ ↗️ Open 📌 Locate 💬 Ask 📝 Ren 📋 Copy│
-│ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Locate 💬 Ask 📝 Ren 📋 Copy│
-└────────────────────────────────────────────────────────────────────────────┘
-1 selected:  ❌ Delete  💬 Ask  📋 Copy
-💡 Finder:  ⌘C > 📋 Paste or ⌥⌘C > ⌘V in Source > 🧲 Add   13.10.2026 14:32 CEST · v1.19.0
-✅ Copied:  report.pdf                          [❌ Delete] [🫣 Hide]
-```
+![The bar in the Claude Code desktop app](docs/images/desktop.png)
 
 ## Install
 
@@ -120,7 +106,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Target and contents
 
-- **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. A long path is shortened to fit: first the part above the project becomes "…/", then the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected.
+- **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. The path starts at the project folder (`…/my-project/docs`); point at it to see the full path. If it is still too long, the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected.
 - **📚 Content** shows when a session starts; **🫣 Hide** closes it and **👁️ Show** opens it again.
 - **📚 Content** is a framed table with the columns tick box, Name, Size and Actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
@@ -224,7 +210,7 @@ claude plugin test .
 
 ### Release a new version
 
-1. Raise `"version"` in `.claude-plugin/plugin.json` and in the bar sketch at the top of this README, for example `1.11.0` to `1.12.0`.
+1. Raise `"version"` in `.claude-plugin/plugin.json`, for example `1.11.0` to `1.12.0`. If the bar looks different, [update the screenshots](#update-the-screenshots).
 2. Add a section for the new version at the top of [CHANGELOG.md](CHANGELOG.md).
 3. Run the check and the tests.
 4. Commit and push.
@@ -240,12 +226,29 @@ claude plugin test .
 
 Users then get the new version with `claude plugin update file-copy-macos` (see [Update](#update)).
 
+### Update the screenshots
+
+The screenshots at the top of this README show a sample project, so they contain no private names or paths.
+
+1. Create the sample project. It goes into `demo` in your clone, which git ignores. It replaces one this script made before, and never touches another folder:
+
+   ```bash
+   scripts/demo-project.sh
+   ```
+
+2. Desktop app: open the `demo` folder of your clone as the folder of a new Code tab session. Make the window about 900 pixels wide.
+3. Terminal: run `cd demo && claude` in the clone, in a window about 100 to 120 columns wide.
+4. In each, take a window screenshot: press Cmd+Shift+4, then Space, then click the window.
+5. Save them as `docs/images/desktop.png` (and `docs/images/terminal.png` for the terminal), replacing the old ones, and commit.
+
 ### Files
 
 | Path | Content |
 | --- | --- |
 | `.claude-plugin/plugin.json` | The mod's manifest |
 | `CHANGELOG.md` | What changed in each version |
+| `docs/images/` | The screenshot in this README |
+| `scripts/demo-project.sh` | Creates the sample project for the screenshots |
 | `.claude-plugin/marketplace.json` | Makes this repository a marketplace |
 | `hooks/register.tsx` | The bar and all actions |
 | `hooks/paths.ts` | Path parsing and size formatting |

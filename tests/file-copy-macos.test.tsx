@@ -1531,8 +1531,9 @@ test('a long Target path is shortened: first the text above the project, then th
   // The desktop's padding per button counts too: here three folders still fit.
   expect(fitCrumbs(above, parts, 40, 2)).toEqual({ above: '…/', crumbs: [0, 'gap', 2, 3, 4] })
 
-  // In the band: a terminal of 60 columns, four folders deep, leaves 29 cells
-  // for the path: the project, "…", then q3 and reports.
+  // In the band: a terminal of 68 columns, four folders deep, leaves 29 cells
+  // for the path (less the label and the two buttons): the project, "…",
+  // then q3 and reports.
   const tree: Record<string, string[]> = {
     '/Users/me/Documents/Claude/Code/my-project': ['docs/'],
     '/Users/me/Documents/Claude/Code/my-project/docs': ['2026/'],
@@ -1547,7 +1548,7 @@ test('a long Target path is shortened: first the text above the project, then th
     plugin: 'file-copy-macos',
     surface: 'terminal',
     ...BAND,
-    props: { ...BAND.props, bodyColumns: 60 },
+    props: { ...BAND.props, bodyColumns: 68 },
   })
   await ui.press({ key: 'list' })
 
@@ -1558,11 +1559,14 @@ test('a long Target path is shortened: first the text above the project, then th
   expect(await crumbs(ui)).toEqual(['my-project', 'q3', 'reports'])
   expect(await ui.find({ type: 'Text', text: '…' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '…/' })).toBeDefined()
+  // Pointing at the path shows it whole.
+  const whole = await ui.find({ type: 'Text', text: ' ~/Documents/Claude/Code/my-project/docs/2026/q3/reports ' })
+  expect(whole?.props.inverse).toBe(true)
 
   // The project folder stays one click away.
   await ui.press({ key: 'crumb:0' })
   expect(await crumbs(ui)).toEqual(['my-project'])
-  // "~/Documents/Claude/Code/my-project" needs 34 cells: still "…/" here.
+  // The part above the project is always "…/".
   expect(await ui.find({ type: 'Text', text: '…/' })).toBeDefined()
   await ui.press({ key: 'list' })
   await ui.unmount()

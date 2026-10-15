@@ -1231,10 +1231,14 @@ export const register: Register = (on, options) => {
     // The Target path: what is left of the row after the label and the two
     // buttons (with their padding on the desktop).
     const pathParts = [baseName(root), ...(dir === '' ? [] : dir.split('/'))]
+    // The part above the project never changes while one works in it: "…/"
+    // stands for it; pointing at the path shows it whole.
     const path = fitCrumbs(
-      `${shortPath(parentOf(root))}/`,
+      '…/',
       pathParts,
-      e.props.bodyColumns - labelWidth - 1 - (lines ? 19 : 27),
+      // The two buttons: "[ ↗️ Open ]" and "[ 📌 Locate ]" with their gaps in
+      // the terminal; about the same with the desktop's padding.
+      e.props.bodyColumns - labelWidth - 1 - 27,
       lines ? 0 : 2,
     )
     // The desktop's buttons have a frame: buttons in rows one above the other
@@ -1385,8 +1389,12 @@ export const register: Register = (on, options) => {
           </Box>
           {/* The path: the part above the project as text, then one button per
               folder from the project down; a click makes it the target. */}
-          {/* A long path is shortened to fit the row: see fitCrumbs. */}
-          <Box flexDirection="row" flexShrink={1}>
+          {/* The path from the project down, shortened to fit the row (see
+              fitCrumbs); a keyed Box, so pointing at it shows the full path. */}
+          <Box key="target-path" flexDirection="row" flexShrink={1}>
+            <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+              <Text inverse>{` ${shortPath(target)} `}</Text>
+            </Box>
             <Text dimColor>{path.above}</Text>
             {path.crumbs.map((crumb, at) => (
               <Box key={`crumb-box:${crumb}`} flexDirection="row">
