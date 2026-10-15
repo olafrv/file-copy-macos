@@ -3,7 +3,7 @@
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
 ```
-📎 Src:     [Paste paths (↵ add)] 📥 Add   📄 Files  📂 Folder  📥 Paste  🧲 Download
+📎 Src:     [Paste paths (↵ add)] 📥 Add   📄 Files  📂 Folder  📥 Paste  🧲 Desktop  🧲 Download
 🎯 Target:  ~/Projects/my-app/docs   ↗️ Open  📌 Locate
 📚 Content: 🙈 Hide   🗂️ New folder   👻 Show .files   Filter: [Name (↵ recursive)] 🔍 Find   ◀ 2/3 (#9) ▶
 ⤴️ my-app/
@@ -91,17 +91,18 @@ The mod is for macOS only, because it uses these macOS commands:
 | `/bin/date` | The time zone of the clock |
 | `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
 
-Listing folders, file sizes, name checks, 🧲 Download and the search outside git use Claude Code's own file access, not commands.
+Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Download and the search outside git use Claude Code's own file access, not commands.
 
 ## What it does
 
-Point at 📥 Paste, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
+Point at 📥 Paste, 🧲 Desktop, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
 ### Copy files and folders
 
 - **Paste paths** into the field and press Enter (or **📥 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
 - **📄 Files** and **📂 Folder** open the macOS picker. You can select several items.
 - **📥 Paste** adds the files and folders you copied in Finder with Cmd+C. Text on the clipboard is ignored.
+- **🧲 Desktop** copies the newest file or folder on your Desktop, for example the screenshot you just took.
 - **🧲 Download** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
 - Folders are copied with all their contents.

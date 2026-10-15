@@ -1034,23 +1034,24 @@ const pickAndCopy = async ($: EngineInterface, kind: PickKind) => {
   }
 }
 
-// Downloads still in progress, and Finder's own files: never the newest.
+// Downloads still in progress, and Finder's own files: never the newest item.
 const isNotDownloaded = (name: string): boolean =>
   name === '.DS_Store' ||
   name === '.localized' ||
   /\.(crdownload|download|part|partial)$/.test(name)
 
-// The newest file or folder in ~/Downloads. A listing knows a file's time;
-// a folder's comes from $.fs.stat.
-const copyLatestDownload = async ($: EngineInterface) => {
-  const downloads = `${await homeDir($)}/Downloads`
-  const listing = await $.fs.list(downloads).catch(() => [])
+// The newest file or folder in a folder of the home folder (~/Downloads,
+// ~/Desktop), copied into the target. A listing knows a file's time; a
+// folder's comes from $.fs.stat.
+const copyNewestFrom = async ($: EngineInterface, folder: 'Downloads' | 'Desktop') => {
+  const from = `${await homeDir($)}/${folder}`
+  const listing = await $.fs.list(from).catch(() => [])
   const items = listing.filter(e => !isNotDownloaded(e.name) && isSafeEntry(e.name))
   const times = await Promise.all(
     items.map(async e =>
       e.kind === 'file'
         ? e.mtimeMs
-        : ((await $.fs.stat(`${downloads}/${e.name}`).catch(() => null))?.mtimeMs ?? 0),
+        : ((await $.fs.stat(`${from}/${e.name}`).catch(() => null))?.mtimeMs ?? 0),
     ),
   )
   const newest = items
@@ -1058,12 +1059,12 @@ const copyLatestDownload = async ($: EngineInterface) => {
     .sort((a, b) => b.time - a.time)[0]
 
   if (newest === undefined) {
-    $.ui.toast('No download found in ~/Downloads')
+    $.ui.toast(`Nothing to copy in ~/${folder}`)
     return
   }
 
   await update($, hint, () => null)
-  await copyIntoProject($, [`${downloads}/${newest.name}`])
+  await copyIntoProject($, [`${from}/${newest.name}`])
 }
 
 const loadVersion = async ($: EngineInterface) => {
@@ -1340,11 +1341,17 @@ export const register: Register = (on, options) => {
               <Text inverse>{` Copy here the files you copied in Finder with Cmd+C `}</Text>
             </Box>
           </Box>
+          <Box key="tip:latest-desktop">
+            <Button key="latest-desktop" label="🧲 Desktop" onPress={() => copyNewestFrom($, 'Desktop')} />
+            <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+              <Text inverse>{` Copy here the newest item of ~/Desktop, for example a screenshot `}</Text>
+            </Box>
+          </Box>
           <Box key="tip:latest-download">
             <Button
               key="latest-download"
               label="🧲 Download"
-              onPress={() => copyLatestDownload($)}
+              onPress={() => copyNewestFrom($, 'Downloads')}
             />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
               <Text inverse>{` Copy here the newest item of ~/Downloads `}</Text>

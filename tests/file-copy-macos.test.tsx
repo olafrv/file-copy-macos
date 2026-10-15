@@ -1012,7 +1012,7 @@ test('Content sorts by a header click and filters by name', async ($, on) => {
   }
 })
 
-test('🧲 Download copies the newest item of ~/Downloads', async ($, on) => {
+test('🧲 Download and 🧲 Desktop copy the newest item of their folder', async ($, on) => {
   const copies: (readonly string[])[] = []
   // A file still downloading is never the newest; a folder's time comes from stat.
   let downloads = ['report.pdf', 'old.txt', 'photos/', 'big.iso.crdownload', '.DS_Store']
@@ -1021,7 +1021,14 @@ test('🧲 Download copies the newest item of ~/Downloads', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   fakeFs(
     on,
-    dir => (dir === '/Users/me/Downloads' ? downloads : dir === '/Users/me/Downloads/photos' ? [] : undefined),
+    dir =>
+      dir === '/Users/me/Downloads'
+        ? downloads
+        : dir === '/Users/me/Desktop'
+          ? ['Screenshot 1.png', 'Screenshot 2.png', '.localized']
+          : dir === '/Users/me/Downloads/photos'
+            ? []
+            : undefined,
     {},
     {
       '/Users/me/Downloads/report.pdf': 300,
@@ -1029,6 +1036,8 @@ test('🧲 Download copies the newest item of ~/Downloads', async ($, on) => {
       '/Users/me/Downloads/photos': 200,
       '/Users/me/Downloads/big.iso.crdownload': 900,
       '/Users/me/Downloads/.DS_Store': 950,
+      '/Users/me/Desktop/Screenshot 1.png': 500,
+      '/Users/me/Desktop/Screenshot 2.png': 700,
     },
   )
   on('process.run', ($, e) => {
@@ -1058,6 +1067,11 @@ test('🧲 Download copies the newest item of ~/Downloads', async ($, on) => {
   downloads = ['.DS_Store', 'x.part']
   await ui.press({ key: 'latest-download' })
   expect(copies.length).toBe(2)
+
+  // 🧲 Desktop does the same for ~/Desktop, for example the newest screenshot.
+  expect((await ui.find({ key: 'latest-desktop' }))?.props.label).toBe('🧲 Desktop')
+  await ui.press({ key: 'latest-desktop' })
+  expect(copies[2]).toEqual(['/proj', 'keep', '/Users/me/Desktop/Screenshot 2.png'])
   await ui.unmount()
 })
 
@@ -1468,6 +1482,7 @@ test('only the buttons whose label does not say enough carry a help tip', async 
   const kept = [
     ' Copy here the files you copied in Finder with Cmd+C ',
     ' Copy here the newest item of ~/Downloads ',
+    ' Copy here the newest item of ~/Desktop, for example a screenshot ',
     ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📥 Paste, or copy their paths with Option+Command+C, paste them into Src and press 📥 Add ',
   ]
   const gone = [
