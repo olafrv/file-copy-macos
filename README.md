@@ -2,7 +2,13 @@
 
 A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar above the prompt where you can copy files and folders from anywhere on your Mac into your project. After each change, Claude gets a short note about it.
 
+**Claude Code desktop app**
+
 ![The bar in the Claude Code desktop app](docs/images/desktop.png)
+
+**Claude Code in a terminal**
+
+![The bar in Claude Code in a terminal](docs/images/terminal.png)
 
 ## Install
 
@@ -62,6 +68,7 @@ A change applies after `/reload-plugins` or in a new session.
 ## Requirements
 
 - macOS 15 or later.
+- In a terminal: a window of at least 80 columns and 35 rows. In a shorter window the bar gets too few rows (Claude Code gives it at most half of the window, together with the prompt), so it scrolls and hides the file list. The desktop app needs nothing special.
 - Claude Code with mod (function hook) support.
 
 The mod is for macOS only, because it uses these macOS commands:
@@ -106,7 +113,7 @@ If a name already exists in the target, the mod asks first:
 | ⏭️ Copy only new | Items with a conflict are not copied. The others are. |
 | ⏹️ Cancel | Nothing is copied. |
 
-### Target and contents
+### Target and content
 
 - **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. The path starts at the project folder (`…/my-project/docs`); point at it to see the full path. If it is still too long, the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected.
 - **📚 Content** shows when a session starts; **🫣 Hide** closes it and **👁️ Show** opens it again.
@@ -121,7 +128,7 @@ If a name already exists in the target, the mod asks first:
   - The setting **Search: skip folders** (see [Settings](#settings)) lists folder names the search always skips. The default is `.git, .svn, .hg, node_modules, bower_components`. Add others, for example `.venv` or `dist`.
   - The search shows at most 500 results and stops after 5 seconds. If it hits a limit, a yellow warning says so.
   - Skipped and ignored items are still in the table when you open their folder.
-- Click **Name** or **Size** in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
+- Click **Name** or **Size** (and **Folder** during a search) in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
 - The list shows 4 to 10 items per page: as many as fit, so the bar does not need to scroll. In a larger terminal window you see more items. The desktop app gives the bar less room, so it usually shows 4. Use **◀** and **▶** after the filter to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
 - Each row has five actions:
   - **↗️ Open:** opens a file in its default macOS app, a folder in Finder.
@@ -144,7 +151,10 @@ The Finder row shows the local date, time and time zone, for example `13.10.2026
 
 After each copy, delete, rename or new folder, the mod adds a short note to the conversation, for example:
 
-> FYI from the file-copy-macos mod: the user copied 1 file(s) into the folder /Users/me/Projects/my-app/docs: report.pdf. This is information only. Do not open, read or change these files ...
+> FYI from the file-copy-macos mod: the user copied 1 file(s) into the folder /Users/me/Projects/my-app/docs:
+> - report.pdf
+>
+> This is information only. Do not open, read or change these files and do not reply to this note. Wait for the next request from the user.
 
 The note does not start a turn. Claude reads it with your next message and does not act on it unless you ask.
 
@@ -154,11 +164,11 @@ The note does not start a turn. Claude reads it with your next message and does 
 - **Every delete asks first.** Overwrite asks in its own question.
 - **Rename never overwrites.** A name that exists is refused.
 - **Files stay inside the project.** The target cannot go above the project root, and folder names with `..` are refused.
-- **Everything stays on your Mac.** The mod copies files on disk. It sends nothing to a server and does not attach files to the prompt.
+- **Everything stays on your Mac.** The mod copies files on disk and sends nothing to a server. It never attaches files to the prompt by itself; 💬 Ask only writes `@path` into it, and you decide whether to send.
 
 ## Limits
 
-- **No drag and drop.** The mod API has no drag events, in either direction. To bring files in, use paste (Option+Cmd+C) or the pickers. To take files out, use **📋 Copy** or **📌 Locate**.
+- **No drag and drop.** The mod API has no drag events, in either direction. To bring files in, use **📋 Paste** (after Cmd+C in Finder), pasted paths (Option+Cmd+C), the pickers, or **🧲 Desktop** and **🧲 Download**. To take files out, use **📋 Copy** or **📌 Locate**.
 - **Buttons use the app's own style.** A mod cannot change their color or font size.
 - **Folder sizes are not shown.** Reading every file in a big folder would be slow.
 - **The search finds names, not file contents.** It does not look inside files.
@@ -239,9 +249,9 @@ The screenshots at the top of this README show a sample project, so they contain
    ```
 
 2. Desktop app: open the `demo` folder of your clone as the folder of a new Code tab session. Make the window about 900 pixels wide.
-3. Terminal: run `cd demo && claude` in the clone, in a window about 100 to 120 columns wide.
+3. Terminal: run `cd demo && claude` in the clone, in a window of about 100 to 120 columns and at least 35 rows.
 4. In each, take a window screenshot: press Cmd+Shift+4, then Space, then click the window.
-5. Save them as `docs/images/desktop.png` (and `docs/images/terminal.png` for the terminal), replacing the old ones, and commit.
+5. Save them as `docs/images/desktop.png` and `docs/images/terminal.png`, replacing the old ones, and commit.
 
 ### Files
 
@@ -249,11 +259,11 @@ The screenshots at the top of this README show a sample project, so they contain
 | --- | --- |
 | `.claude-plugin/plugin.json` | The mod's manifest |
 | `CHANGELOG.md` | What changed in each version |
-| `docs/images/` | The screenshot in this README |
+| `docs/images/` | The screenshots in this README |
 | `scripts/demo-project.sh` | Creates the sample project for the screenshots |
 | `.claude-plugin/marketplace.json` | Makes this repository a marketplace |
 | `hooks/register.tsx` | The bar and all actions |
-| `hooks/paths.ts` | Path parsing and size formatting |
+| `hooks/paths.ts` | Helpers without side effects: path parsing, filtering, sorting, the path shortening, the clock and size formats |
 | `types/index.d.ts` | The type contract for the mod's saved state |
 | `tests/file-copy-macos.test.tsx` | Tests, run by `claude plugin test` |
 
