@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.0
+
+- "📎 Src:" is "📎 Source:" again, and the 💡 Finder tip says "in Source".
+- "📂 Folder" is now "🗂️ Folders", because the picker accepts several folders (hold Cmd and click each one).
+- New icons: 📋 Paste, 🧲 Add, 👁️ Show and 🫣 Hide.
+
 ## 1.18.0
 
 - New button **🧲 Desktop**, before 🧲 Download: it copies the newest file or folder on your Desktop into the target, for example the screenshot you just took.

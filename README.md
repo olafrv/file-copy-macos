@@ -14,7 +14,7 @@ A [Claude Code](https://claude.com/claude-code) mod for macOS. It adds a bar abo
 │ ☑  │ 📄 report.pdf     │ 13 KB   │ ↗️ Open 📌 Locate 💬 Ask 📝 Ren 📋 Copy│
 └────────────────────────────────────────────────────────────────────────────┘
 1 selected:  ❌ Delete  💬 Ask  📋 Copy
-💡 Finder:  ⌘C > 📋 Paste or ⌥⌘C > ⌘V in Source > 🧲 Add   13.10.2026 14:32 CEST · v1.18.0
+💡 Finder:  ⌘C > 📋 Paste or ⌥⌘C > ⌘V in Source > 🧲 Add   13.10.2026 14:32 CEST · v1.19.0
 ✅ Copied:  report.pdf                          [❌ Delete] [🫣 Hide]
 ```
 
