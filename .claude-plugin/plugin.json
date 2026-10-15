@@ -1,6 +1,6 @@
 {
   "name": "file-copy-macos",
-  "version": "1.17.3",
+  "version": "1.18.0",
   "description": "Band above the prompt that copies pasted or picked files and folders into a project folder and tells Claude as an FYI.",
   "author": {
     "name": "Olaf Reitmaier"

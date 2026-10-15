@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.18.0
+
+- New button **🧲 Desktop**, before 🧲 Download: it copies the newest file or folder on your Desktop into the target, for example the screenshot you just took.
+
 ## 1.17.3
 
 - 📚 Content shows the file list from the start of each session. 🙈 Hide still closes it.
