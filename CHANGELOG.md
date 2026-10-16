@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.20.2
+
+- New green button **♻️ Refresh** before 🫣 Hide / 👁️ Show: it reads the list again, for changes made outside the bar. During a search, it runs the search again.
+- README: new screenshots, and the terminal screenshot is taken at the standard size, 80×24.
+
 ## 1.20.1
 
 - README: screenshots of the bar in the desktop app and in a terminal.
