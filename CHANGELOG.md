@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.22.1
+
+- README: new screenshots that show 🧲 Downloads and "Filter: Name".
+
 ## 1.22.0
 
 - New button **✴️ Claude** on the 🎯 Target row: opens a new Terminal window in the target and starts Claude Code there. It looks for the `claude` program in the usual install folders; if there is none, a toast says so. macOS asks once for the Automation permission.
