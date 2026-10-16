@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.21.0
+
+- New button **📸 Shot**, between 📋 Paste and 🧲 Desktop: take a screenshot (drag an area, or Space and click a window) and save it straight into the target as `YYYY-MM-DD - HHMMSS - Screenshot.png`.
+- It needs the macOS Screen Recording permission for the app that runs Claude Code. Without it, a toast says where to allow it.
+
 ## 1.20.2
 
 - New green button **♻️ Refresh** before 🫣 Hide / 👁️ Show: it reads the list again, for changes made outside the bar. During a search, it runs the search again.
