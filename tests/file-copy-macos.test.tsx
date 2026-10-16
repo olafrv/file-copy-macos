@@ -1734,6 +1734,7 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
 
   const source = ['pick', 'pick-folder', 'paste-files', 'latest-desktop', 'latest-download']
   expect(await Promise.all(source.map(key => labelOf(ui, key)))).toEqual(['📄', '🗂️', '📋', '🧲🖥️', '🧲⬇️'])
+  expect(await labelOf(ui, 'refresh')).toBe('♻️')
   expect(await labelOf(ui, 'list')).toBe('🫣')
   expect(await labelOf(ui, 'new-folder')).toBe('🗂️ New')
   expect(await labelOf(ui, 'dotfiles')).toBe('👻 .files')
@@ -1747,10 +1748,12 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   const sourceRow = 2 + 1 + 20 + buttons.reduce((sum, w) => sum + w + 1, 0)
   expect(sourceRow).toBeLessThanOrEqual(75)
 
-  // Content row: the icon label, Hide, New folder, .files, the filter box
-  // (26), Clear and the page control "◀ 1/2 (#7) ▶".
-  const plain = await Promise.all(['list', 'new-folder', 'dotfiles'].map(async key => cells(await labelOf(ui, key))))
-  const contentRow = 2 + 1 + plain.reduce((sum, w) => sum + w + 1, 0) + 26 + 1 + 8 + 1 + cells('◀ 1/2 (#7) ▶')
+  // Content row: the icon label, Refresh, Hide, New folder, .files, the
+  // filter box (24), Clear and the page control "◀ 1/2 (#7) ▶".
+  const plain = await Promise.all(
+    ['refresh', 'list', 'new-folder', 'dotfiles'].map(async key => cells(await labelOf(ui, key))),
+  )
+  const contentRow = 2 + 1 + plain.reduce((sum, w) => sum + w + 1, 0) + 24 + 1 + 8 + 1 + cells('◀ 1/2 (#7) ▶')
   expect(contentRow).toBeLessThanOrEqual(75)
   // The page holds 4 items in 12 rows.
   expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
@@ -1768,4 +1771,46 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   expect(await labelOf(wide, 'list')).toBe('🫣 Hide')
   expect(await wide.find({ type: 'Text', text: '📚 Content:' })).toBeDefined()
   await wide.unmount()
+})
+
+test('♻️ Refresh reads the list again, runs a search again, and opens a closed list', async ($, on) => {
+  let names = ['a.txt']
+  const runs: string[] = []
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', ($, e) => {
+    if (e.argv.includes('rev-parse')) {
+      return { value: ran('true\n') }
+    }
+
+    if (e.argv.includes('ls-files')) {
+      runs.push('search')
+      return { value: ran(names.map(n => `docs/${n}\0`).join('')) }
+    }
+
+    return { value: ran('') }
+  })
+  fakeFs(on, dir => (dir === '/proj' ? names : dir === '/proj/docs' ? names : undefined))
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  expect((await ui.find({ key: 'refresh' }))?.props.label).toBe('♻️ Refresh')
+
+  // A closed list opens.
+  await ui.press({ key: 'refresh' })
+  expect(await ui.find({ key: 'file:a.txt' })).toBeDefined()
+
+  // A file made outside the bar shows after Refresh.
+  names = ['a.txt', 'b.txt']
+  expect(await ui.find({ key: 'file:b.txt' })).toBeUndefined()
+  await ui.press({ key: 'refresh' })
+  expect(await ui.find({ key: 'file:b.txt' })).toBeDefined()
+
+  // During a search, Refresh runs it again.
+  await ui.input({ key: 'filter-0', text: '.txt' })
+  expect(runs.length).toBe(1)
+  names = ['a.txt', 'b.txt', 'c.txt']
+  await ui.press({ key: 'refresh' })
+  expect(runs.length).toBe(2)
+  expect(await ui.find({ key: 'file:docs/c.txt' })).toBeDefined()
+  await ui.unmount()
 })

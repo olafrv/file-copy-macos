@@ -88,7 +88,7 @@ Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Download and the se
 
 ## What it does
 
-The rows of the bar are 📎 Source, 🎯 Target, 📚 Content and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and the 📎 Source and 📚 Content buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, 🧲🖥️ Desktop, 🧲⬇️ Download, 🫣 Hide, 🗂️ New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
+The rows of the bar are 📎 Source, 🎯 Target, 📚 Content and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and the 📎 Source and 📚 Content buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, 🧲🖥️ Desktop, 🧲⬇️ Download, ♻️ Refresh, 🫣 Hide, 🗂️ New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
 
 Point at 📋 Paste, 🧲 Desktop, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
@@ -117,6 +117,7 @@ If a name already exists in the target, the mod asks first:
 
 - **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. The path starts at the project folder (`…/my-project/docs`); point at it to see the full path. If it is still too long, the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected.
 - **📚 Content** shows when a session starts; **🫣 Hide** closes it and **👁️ Show** opens it again.
+- **♻️ Refresh** reads the list again, for changes made outside the bar (for example in Finder). During a search it runs the search again.
 - **📚 Content** is a framed table with the columns tick box, Name, Size and Actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
@@ -249,7 +250,7 @@ The screenshots at the top of this README show a sample project, so they contain
    ```
 
 2. Desktop app: open the `demo` folder of your clone as the folder of a new Code tab session. Make the window about 900 pixels wide.
-3. Terminal: run `cd demo && claude` in the clone, in a window of about 100 to 120 columns and at least 35 rows.
+3. Terminal: run `cd demo && claude` in the clone, in a window of the standard size, 80 columns and 24 rows (in Terminal: Shell > New Window opens one).
 4. In each, take a window screenshot: press Cmd+Shift+4, then Space, then click the window.
 5. Save them as `docs/images/desktop.png` and `docs/images/terminal.png`, replacing the old ones, and commit.
 

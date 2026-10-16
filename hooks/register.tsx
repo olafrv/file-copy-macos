@@ -887,6 +887,23 @@ const runSearch = async ($: EngineInterface, text: string) => {
   }
 }
 
+// ♻️ Refresh: reads the list again (names and sizes), for changes made
+// outside the bar; during a search it runs the search again. A closed list
+// opens.
+const refreshList = async ($: EngineInterface) => {
+  if (!(await read($, isListOpen))) {
+    await toggleList($)
+    return
+  }
+
+  if ((await read($, searchHits)) !== null) {
+    await runSearch($, await read($, filter))
+    return
+  }
+
+  await loadEntries($)
+}
+
 const toggleSelected = async ($: EngineInterface, name: string) => {
   await update($, isConfirming, () => false)
   await update($, selected, list =>
@@ -1437,6 +1454,12 @@ export const register: Register = (on, options) => {
             <Text>{label('📚', 'Content')}</Text>
           </Box>
           <Button
+            key="refresh"
+            label={narrow ? '♻️' : '♻️ Refresh'}
+            plain
+            onPress={() => refreshList($)}
+          />
+          <Button
             key="list"
             label={narrow ? (listOpen ? '🫣' : '👁️') : listOpen ? '🫣 Hide' : '👁️ Show'}
             plain
@@ -1459,7 +1482,7 @@ export const register: Register = (on, options) => {
           />
           {/* The terminal draws the field as wide as its box; the desktop at its
               own width, so a fixed box there would push Clear away. */}
-          <Box width={lines ? (narrow ? 26 : 38) : undefined}>
+          <Box width={lines ? (narrow ? 24 : 38) : undefined}>
             <Input
               key={`filter-${await read($, filterId)}`}
               label="Filter"
