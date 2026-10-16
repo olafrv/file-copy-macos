@@ -9,6 +9,7 @@ import {
   formatClock,
   humanSize,
   isSafeEntry,
+  shotName,
   isHiddenEntry,
   pageSizeFor,
   parsePaths,
@@ -1732,8 +1733,8 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   })
   await ui.press({ key: 'list' })
 
-  const source = ['pick', 'pick-folder', 'paste-files', 'latest-desktop', 'latest-download']
-  expect(await Promise.all(source.map(key => labelOf(ui, key)))).toEqual(['📄', '🗂️', '📋', '🧲🖥️', '🧲⬇️'])
+  const source = ['pick', 'pick-folder', 'paste-files', 'shot', 'latest-desktop', 'latest-download']
+  expect(await Promise.all(source.map(key => labelOf(ui, key)))).toEqual(['📄', '🗂️', '📋', '📸', '🧲🖥️', '🧲⬇️'])
   expect(await labelOf(ui, 'refresh')).toBe('♻️')
   expect(await labelOf(ui, 'list')).toBe('🫣')
   expect(await labelOf(ui, 'new-folder')).toBe('🗂️ New')
@@ -1813,4 +1814,75 @@ test('♻️ Refresh reads the list again, runs a search again, and opens a clos
   expect(runs.length).toBe(2)
   expect(await ui.find({ key: 'file:docs/c.txt' })).toBeDefined()
   await ui.unmount()
+})
+
+test('📸 Shot saves a screenshot straight into the target, named by the local time', async ($, on) => {
+  // 15:37:56 UTC is 17:37:56 in CEST.
+  const at = Date.UTC(2026, 9, 16, 15, 37, 56)
+  expect(shotName(at, 120)).toBe('2026-10-16 - 173756 - Screenshot.png')
+  expect(shotName(at, 120, 2)).toBe('2026-10-16 - 173756 - Screenshot 2.png')
+
+  const session = mock.session(on)
+  let folder: string[] = []
+  const captures: (readonly string[])[] = []
+  let isCancelled = false
+  let isRefused = false
+  const toasts: string[] = []
+  on('ui.toast', ($, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
+
+  on('session.root', () => ({ value: '/proj' }))
+  on('clock.now', () => ({ value: at }))
+  fakeFs(on, dir => (dir === '/proj' ? folder : undefined))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/bin/date') {
+      return { value: ran('+0200 CEST\n') }
+    }
+
+    if (e.argv[0] === '/usr/sbin/screencapture') {
+      captures.push(e.argv)
+      if (isRefused) {
+        return { value: { ...ran(''), exitCode: 1, stderr: 'could not create image from display' } }
+      }
+      const path = e.argv[e.argv.length - 1] ?? ''
+      if (!isCancelled) folder = [...folder, path.slice('/proj/'.length)]
+    }
+
+    return { value: ran('') }
+  })
+  on('session.start', () => ({ cwd: '/proj' }))
+  mock.store(on)
+  await $.session.start({ cwd: '/proj', surface: 'desktop', isInteractive: true })
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  expect((await ui.find({ key: 'shot' }))?.props.label).toBe('📸 Shot')
+
+  // A capture: macOS's own selection, no sound, straight into the target.
+  await ui.press({ key: 'shot' })
+  expect(captures[0]).toEqual(['/usr/sbin/screencapture', '-i', '-x', '/proj/2026-10-16 - 173756 - Screenshot.png'])
+  expect(await ui.find({ key: 'file:2026-10-16 - 173756 - Screenshot.png' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '2026-10-16 - 173756 - Screenshot.png' })).toBeDefined()
+
+  // A second shot in the same second gets " 2".
+  await ui.press({ key: 'shot' })
+  expect(captures[1]?.[3]).toBe('/proj/2026-10-16 - 173756 - Screenshot 2.png')
+
+  // Esc: nothing saved, nothing told.
+  isCancelled = true
+  await ui.press({ key: 'shot' })
+  expect(folder.length).toBe(2)
+
+  // Refused by macOS (no Screen Recording permission): nothing saved; the
+  // mod says why in a toast instead of staying silent.
+  isRefused = true
+  await ui.press({ key: 'shot' })
+  expect(folder.length).toBe(2)
+  expect(toasts.some(t => t.includes('Screen Recording'))).toBe(true)
+  await ui.unmount()
+
+  const fyi = session.appended().filter(r => r.message.type === 'user')
+  expect(fyi.length).toBe(2)
+  expect(JSON.stringify(fyi[0])).toContain('2026-10-16 - 173756 - Screenshot.png')
 })

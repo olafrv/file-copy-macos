@@ -10,6 +10,7 @@ import {
   entryFolder,
   entryName,
   fitCrumbs,
+  shotName,
   isHiddenEntry,
   pageSizeFor,
   fitStart,
@@ -1060,6 +1061,52 @@ const pickAndCopy = async ($: EngineInterface, kind: PickKind) => {
   }
 }
 
+// 📸 Shot: macOS's own capture (drag an area, Space then click a window,
+// Esc to cancel) saves a PNG straight into the target, named by the local
+// time. -x: no camera sound. Like a copy, it shows in Copied and Claude
+// gets a note. The first time, macOS asks to allow Screen Recording for the
+// app that runs Claude Code.
+const takeShot = async ($: EngineInterface) => {
+  const dir = await targetDir($)
+  const now = await $.clock.now()
+  const offset = await read($, zoneOffset)
+  let n = 1
+
+  while (await $.fs.exists(`${dir}/${shotName(now, offset, n)}`)) {
+    n += 1
+  }
+
+  const name = shotName(now, offset, n)
+  const path = `${dir}/${name}`
+
+  const shot = await $.process.run(['/usr/sbin/screencapture', '-i', '-x', path], {
+    timeoutMs: 600_000,
+  })
+
+  if (!(await $.fs.exists(path))) {
+    // macOS refuses without Screen Recording permission ("could not create
+    // image from display"); Esc saves nothing and says nothing.
+    if (shot.exitCode !== 0) {
+      $.ui.toast(
+        'Could not take the screenshot. Allow Screen Recording for the app that runs Claude Code: ' +
+          'System Settings > Privacy & Security > Screen & System Audio Recording.',
+      )
+    }
+
+    return
+  }
+
+  await update($, last, () => ({ root: dir, copied: [name], skipped: [], failed: [] }))
+  await update($, isHidden, () => false)
+
+  if (await read($, isListOpen)) {
+    await loadEntries($)
+  }
+
+  await tellClaude($, dir, [name])
+  $.ui.toast(`Saved ${name}`)
+}
+
 // Downloads still in progress, and Finder's own files: never the newest item.
 const isNotDownloaded = (name: string): boolean =>
   name === '.DS_Store' ||
@@ -1377,6 +1424,7 @@ export const register: Register = (on, options) => {
               <Text inverse>{` Copy here the files you copied in Finder with Cmd+C `}</Text>
             </Box>
           </Box>
+          <Button key="shot" label={narrow ? '📸' : '📸 Shot'} onPress={() => takeShot($)} />
           <Box key="tip:latest-desktop">
             <Button key="latest-desktop" label={narrow ? '🧲🖥️' : '🧲 Desktop'} onPress={() => copyNewestFrom($, 'Desktop')} />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>

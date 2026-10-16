@@ -80,6 +80,7 @@ The mod is for macOS only, because it uses these macOS commands:
 | `/bin/mkdir` | 🗂️ New folder |
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
 | `/usr/bin/open` | ↗️ Open and 📌 Locate |
+| `/usr/sbin/screencapture` | 📸 Shot |
 | `/usr/bin/osascript` | 📄 Files and 🗂️ Folders pickers, 📋 Copy and 📋 Paste (clipboard) |
 | `/bin/date` | The time zone of the clock |
 | `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
@@ -88,7 +89,7 @@ Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Download and the se
 
 ## What it does
 
-The rows of the bar are 📎 Source, 🎯 Target, 📚 Content and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and the 📎 Source and 📚 Content buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, 🧲🖥️ Desktop, 🧲⬇️ Download, ♻️ Refresh, 🫣 Hide, 🗂️ New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
+The rows of the bar are 📎 Source, 🎯 Target, 📚 Content and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and the 📎 Source and 📚 Content buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, 📸 Shot, 🧲🖥️ Desktop, 🧲⬇️ Download, ♻️ Refresh, 🫣 Hide, 🗂️ New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
 
 Point at 📋 Paste, 🧲 Desktop, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
@@ -97,6 +98,7 @@ Point at 📋 Paste, 🧲 Desktop, 🧲 Download or the 💡 Finder tip to see w
 - **Paste paths** into the field and press Enter (or **🧲 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
 - **📄 Files** and **🗂️ Folders** open the macOS picker. You can select several items: hold Cmd and click each one.
 - **📋 Paste** adds the files and folders you copied in Finder with Cmd+C. Text on the clipboard is ignored.
+- **📸 Shot** takes a screenshot straight into the target: drag an area, or press Space and click a window; Esc cancels. The image is named by the local time, for example `2026-10-16 - 173756 - Screenshot.png`. It needs the macOS **Screen Recording** permission (System Settings > Privacy & Security > Screen & System Audio Recording) for the app that runs Claude Code: for the desktop app the entry **Claude** ("Claude Desktop" alone may not be enough), for a terminal session your terminal app. Quit and reopen the app after turning it on. Without it, a toast says the screenshot could not be taken.
 - **🧲 Desktop** copies the newest file or folder on your Desktop, for example the screenshot you just took.
 - **🧲 Download** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
