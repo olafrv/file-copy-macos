@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.22.0
+
+- New button **✴️ Claude** on the 🎯 Target row: opens a new Terminal window in the target and starts Claude Code there. It looks for the `claude` program in the usual install folders; if there is none, a toast says so. macOS asks once for the Automation permission.
+- **📁 New folder** and **📸 Shot** moved to the 🎯 Target row, because both create something in the target. New folder is now a framed button with its own icon, 📁 (🗂️ is only Folders).
+- 📎 Source: the field's placeholder is now `Paths ↵`. On the desktop the buttons follow the field directly, without a gap.
+- Row labels never break onto two lines, and the desktop label column is 1 character narrower.
+- **🧲 Download** is now **🧲 Downloads**, like the folder. The tooltips are shorter ("Copy newest item of ~/Downloads").
+- 📸 Shot: the permission toast names the right app, "Claude" on the desktop and "your terminal app" in a terminal.
+- Terminal: a space after "Filter:".
+- README: new screenshots. The sample project script and the screenshot steps are removed.
+
 ## 1.21.0
 
 - New button **📸 Shot**, between 📋 Paste and 🧲 Desktop: take a screenshot (drag an area, or Space and click a window) and save it straight into the target as `YYYY-MM-DD - HHMMSS - Screenshot.png`.
