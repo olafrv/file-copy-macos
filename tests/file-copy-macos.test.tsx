@@ -408,7 +408,13 @@ test('Content opens folders, makes them the target and creates new ones', async 
     return { value: ran('') }
   })
 
-  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  // Wide enough for the whole path next to the Target buttons.
+  const ui = await $.ui.mount({
+    plugin: 'file-copy-macos',
+    surface: 'desktop',
+    ...BAND,
+    props: { ...BAND.props, bodyColumns: 120 },
+  })
   await ui.press({ key: 'list' })
   const rows = (await ui.findAll({ type: 'Button' }))
     .map(b => b.key ?? '')
@@ -629,6 +635,42 @@ test('Open opens a file with its default app, a folder and the target in Finder'
   ])
   expect(await ui.find({ type: 'Text', text: '/proj/docs' })).toBeUndefined()
   await ui.press({ key: 'list' })
+  await ui.unmount()
+})
+
+test('✴️ Claude opens Claude Code in a new Terminal window in the target', async ($, on) => {
+  const scripts: (readonly string[])[] = []
+  const toasts: string[] = []
+  let installed: string[] = []
+
+  on('ui.toast', ($, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
+  mock.env(on, { HOME: '/Users/me' })
+  on('session.root', () => ({ value: "/proj/it's here" }))
+  fakeFs(on, dir => (dir === "/proj/it's here" ? [] : dir.endsWith('/bin') ? installed : undefined))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/usr/bin/osascript') {
+      scripts.push(e.argv)
+    }
+
+    return { value: ran('') }
+  })
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  // Not installed: no Terminal window, a toast says so.
+  await ui.press({ key: 'claude-target' })
+  expect(scripts).toHaveLength(0)
+  expect(toasts).toEqual(['Claude Code is not installed for the terminal. See claude.com/claude-code'])
+
+  // Installed: run by its full path in the target; both are the script's
+  // arguments, quoted by AppleScript itself.
+  installed = ['claude']
+  await ui.press({ key: 'claude-target' })
+  expect(scripts).toHaveLength(1)
+  expect(scripts[0]?.slice(-2)).toEqual(["/proj/it's here", '/Users/me/.local/bin/claude'])
+  expect(scripts[0]?.join(' ')).toContain('quoted form of (item 2 of argv)')
   await ui.unmount()
 })
 
@@ -1013,7 +1055,7 @@ test('Content sorts by a header click and filters by name', async ($, on) => {
   }
 })
 
-test('🧲 Download and 🧲 Desktop copy the newest item of their folder', async ($, on) => {
+test('🧲 Downloads and 🧲 Desktop copy the newest item of their folder', async ($, on) => {
   const copies: (readonly string[])[] = []
   // A file still downloading is never the newest; a folder's time comes from stat.
   let downloads = ['report.pdf', 'old.txt', 'photos/', 'big.iso.crdownload', '.DS_Store']
@@ -1484,9 +1526,9 @@ test('only the buttons whose label does not say enough carry a help tip', async 
   fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf'] : undefined))
 
   const kept = [
-    ' Copy here the files you copied in Finder with Cmd+C ',
-    ' Copy here the newest item of ~/Downloads ',
-    ' Copy here the newest item of ~/Desktop, for example a screenshot ',
+    ' Copy files you copied in Finder with Cmd+C ',
+    ' Copy newest item of ~/Downloads ',
+    ' Copy newest item of ~/Desktop, for example a screenshot ',
     ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📋 Paste, or copy their paths with Option+Command+C, paste them into 📎 Source and press 🧲 Add ',
   ]
   const gone = [
@@ -1535,8 +1577,8 @@ test('a long Target path is shortened: first the text above the project, then th
   // The desktop's padding per button counts too: here three folders still fit.
   expect(fitCrumbs(above, parts, 40, 2)).toEqual({ above: '…/', crumbs: [0, 'gap', 2, 3, 4] })
 
-  // In the band: a terminal of 59 columns, four folders deep, leaves 29 cells
-  // for the path (less the label icon and the two buttons): the project,
+  // In the band: a terminal of 84 columns, four folders deep, leaves 29 cells
+  // for the path (less the label icon and the five buttons): the project,
   // "…", then q3 and reports.
   const tree: Record<string, string[]> = {
     '/Users/me/Documents/Claude/Code/my-project': ['docs/'],
@@ -1552,7 +1594,7 @@ test('a long Target path is shortened: first the text above the project, then th
     plugin: 'file-copy-macos',
     surface: 'terminal',
     ...BAND,
-    props: { ...BAND.props, bodyColumns: 59 },
+    props: { ...BAND.props, bodyColumns: 84 },
   })
   await ui.press({ key: 'list' })
 
@@ -1733,24 +1775,26 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   })
   await ui.press({ key: 'list' })
 
-  const source = ['pick', 'pick-folder', 'paste-files', 'shot', 'latest-desktop', 'latest-download']
-  expect(await Promise.all(source.map(key => labelOf(ui, key)))).toEqual(['📄', '🗂️', '📋', '📸', '🧲🖥️', '🧲⬇️'])
+  const source = ['pick', 'pick-folder', 'paste-files', 'latest-desktop', 'latest-download']
+  expect(await Promise.all(source.map(key => labelOf(ui, key)))).toEqual(['📄', '🗂️', '📋', '🧲🖥️', '🧲⬇️'])
+  // The Target row's buttons that make something new.
+  expect(await labelOf(ui, 'new-folder')).toBe('📁 New')
+  expect(await labelOf(ui, 'shot')).toBe('📸')
   expect(await labelOf(ui, 'refresh')).toBe('♻️')
   expect(await labelOf(ui, 'list')).toBe('🫣')
-  expect(await labelOf(ui, 'new-folder')).toBe('🗂️ New')
   expect(await labelOf(ui, 'dotfiles')).toBe('👻 .files')
   // The rows' labels show their icons alone.
   expect(await ui.find({ type: 'Text', text: '📚' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '📚 Content:' })).toBeUndefined()
 
   // Source row: the icon label, then the field (at least 20 cells for
-  // "Paste paths (↵ add)" and its Add), then the buttons in brackets.
+  // "Paths ↵" and its Add), then the buttons in brackets.
   const buttons = await Promise.all(source.map(async key => cells(await labelOf(ui, key)) + 4))
   const sourceRow = 2 + 1 + 20 + buttons.reduce((sum, w) => sum + w + 1, 0)
   expect(sourceRow).toBeLessThanOrEqual(75)
 
   // Content row: the icon label, Refresh, Hide, New folder, .files, the
-  // filter box (24), Clear and the page control "◀ 1/2 (#7) ▶".
+  // filter label and box (8 + 16), Clear and the page control "◀ 1/2 (#7) ▶".
   const plain = await Promise.all(
     ['refresh', 'list', 'new-folder', 'dotfiles'].map(async key => cells(await labelOf(ui, key))),
   )
@@ -1768,7 +1812,7 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
 
   // A wide terminal keeps the words.
   const wide = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND, props: { ...BAND.props, bodyColumns: 115 } })
-  expect(await labelOf(wide, 'latest-download')).toBe('🧲 Download')
+  expect(await labelOf(wide, 'latest-download')).toBe('🧲 Downloads')
   expect(await labelOf(wide, 'list')).toBe('🫣 Hide')
   expect(await wide.find({ type: 'Text', text: '📚 Content:' })).toBeDefined()
   await wide.unmount()
@@ -1879,7 +1923,13 @@ test('📸 Shot saves a screenshot straight into the target, named by the local 
   isRefused = true
   await ui.press({ key: 'shot' })
   expect(folder.length).toBe(2)
-  expect(toasts.some(t => t.includes('Screen Recording'))).toBe(true)
+  expect(toasts.some(t => t.includes('Allow Screen Recording for Claude:'))).toBe(true)
+
+  // In a terminal session the permission belongs to the terminal app.
+  const term = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
+  await term.press({ key: 'shot' })
+  expect(toasts.some(t => t.includes('Allow Screen Recording for your terminal app:'))).toBe(true)
+  await term.unmount()
   await ui.unmount()
 
   const fyi = session.appended().filter(r => r.message.type === 'user')

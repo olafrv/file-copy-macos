@@ -77,30 +77,29 @@ The mod is for macOS only, because it uses these macOS commands:
 | --- | --- |
 | `/bin/sh` with `cp -R` | Copying into the project, and the "name 2" rule for Keep both |
 | `/bin/mv` | 📝 Ren |
-| `/bin/mkdir` | 🗂️ New folder |
+| `/bin/mkdir` | 📁 New folder |
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
 | `/usr/bin/open` | ↗️ Open and 📌 Locate |
 | `/usr/sbin/screencapture` | 📸 Shot |
-| `/usr/bin/osascript` | 📄 Files and 🗂️ Folders pickers, 📋 Copy and 📋 Paste (clipboard) |
+| `/usr/bin/osascript` | 📄 Files and 🗂️ Folders pickers, 📋 Copy and 📋 Paste (clipboard), ✴️ Claude (Terminal) |
 | `/bin/date` | The time zone of the clock |
 | `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
 
-Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Download and the search outside git use Claude Code's own file access, not commands.
+Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Downloads and the search outside git use Claude Code's own file access, not commands.
 
 ## What it does
 
-The rows of the bar are 📎 Source, 🎯 Target, 📚 Content and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and the 📎 Source and 📚 Content buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, 📸 Shot, 🧲🖥️ Desktop, 🧲⬇️ Download, ♻️ Refresh, 🫣 Hide, 🗂️ New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
+The rows of the bar are 📎 Source, 🎯 Target, 📚 Content and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and most buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, ✴️ Claude, 📸 Shot, 🧲🖥️ Desktop, 🧲⬇️ Downloads, ♻️ Refresh, 🫣 Hide, 📁 New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
 
-Point at 📋 Paste, 🧲 Desktop, 🧲 Download or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
+Point at 📋 Paste, 🧲 Desktop, 🧲 Downloads or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
 ### Copy files and folders
 
 - **Paste paths** into the field and press Enter (or **🧲 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
 - **📄 Files** and **🗂️ Folders** open the macOS picker. You can select several items: hold Cmd and click each one.
 - **📋 Paste** adds the files and folders you copied in Finder with Cmd+C. Text on the clipboard is ignored.
-- **📸 Shot** takes a screenshot straight into the target: drag an area, or press Space and click a window; Esc cancels. The image is named by the local time, for example `2026-10-16 - 173756 - Screenshot.png`. It needs the macOS **Screen Recording** permission (System Settings > Privacy & Security > Screen & System Audio Recording) for the app that runs Claude Code: for the desktop app the entry **Claude** ("Claude Desktop" alone may not be enough), for a terminal session your terminal app. Quit and reopen the app after turning it on. Without it, a toast says the screenshot could not be taken.
 - **🧲 Desktop** copies the newest file or folder on your Desktop, for example the screenshot you just took.
-- **🧲 Download** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
+- **🧲 Downloads** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
 - Folders are copied with all their contents.
 
@@ -117,13 +116,14 @@ If a name already exists in the target, the mod asks first:
 
 ### Target and content
 
-- **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. The path starts at the project folder (`…/my-project/docs`); point at it to see the full path. If it is still too long, the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected.
+- **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. The path starts at the project folder (`…/my-project/docs`); point at it to see the full path. If it is still too long, the folders in the middle become "…". **↗️ Open** opens the target folder in Finder. **📌 Locate** shows it in its parent folder, selected. **✴️ Claude** opens a new Terminal window in the target and starts Claude Code there (it looks for the `claude` program in the usual install folders; if there is none, a toast says so). It always uses the Terminal app, also from the desktop app. The first time, macOS asks whether Claude (or your terminal app) may control Terminal: allow it. To change it later: System Settings > Privacy & Security > Automation.
+- **📁 New folder** creates a folder in the target and opens it.
+- **📸 Shot** takes a screenshot straight into the target: drag an area, or press Space and click a window; Esc cancels. The image is named by the local time, for example `2026-10-16 - 173756 - Screenshot.png`. It needs the macOS **Screen Recording** permission (System Settings > Privacy & Security > Screen & System Audio Recording) for the app that runs Claude Code: for the desktop app the entry **Claude** ("Claude Desktop" alone may not be enough), for a terminal session your terminal app. Quit and reopen the app after turning it on. Without it, a toast says the screenshot could not be taken.
 - **📚 Content** shows when a session starts; **🫣 Hide** closes it and **👁️ Show** opens it again.
 - **♻️ Refresh** reads the list again, for changes made outside the bar (for example in Finder). During a search it runs the search again.
 - **📚 Content** is a framed table with the columns tick box, Name, Size and Actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
-- **🗂️ New folder** creates a folder in the target and opens it.
 - Names that start with "." (for example `.env` or `.claude`) are hidden, as in Finder. **👻 Show .files** shows them, in the list and in search results; **👻 Hide .files** hides them again. The mod remembers your choice.
 - **Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🫣 Hide**.
 - **🔍 Find** (or Enter) searches the target folder and all folders below it. The table then gets a **Folder** column with each item's folder. Point at a folder there to see its full path; a click opens it. All actions work on the items found, and 📝 Ren keeps an item in its own folder. Typing in the filter again, 🧹 Clear or opening a folder ends the search.
@@ -171,7 +171,7 @@ The note does not start a turn. Claude reads it with your next message and does 
 
 ## Limits
 
-- **No drag and drop.** The mod API has no drag events, in either direction. To bring files in, use **📋 Paste** (after Cmd+C in Finder), pasted paths (Option+Cmd+C), the pickers, or **🧲 Desktop** and **🧲 Download**. To take files out, use **📋 Copy** or **📌 Locate**.
+- **No drag and drop.** The mod API has no drag events, in either direction. To bring files in, use **📋 Paste** (after Cmd+C in Finder), pasted paths (Option+Cmd+C), the pickers, or **🧲 Desktop** and **🧲 Downloads**. To take files out, use **📋 Copy** or **📌 Locate**.
 - **Buttons use the app's own style.** A mod cannot change their color or font size.
 - **Folder sizes are not shown.** Reading every file in a big folder would be slow.
 - **The search finds names, not file contents.** It does not look inside files.
@@ -225,7 +225,7 @@ claude plugin test .
 
 ### Release a new version
 
-1. Raise `"version"` in `.claude-plugin/plugin.json`, for example `1.11.0` to `1.12.0`. If the bar looks different, [update the screenshots](#update-the-screenshots).
+1. Raise `"version"` in `.claude-plugin/plugin.json`, for example `1.11.0` to `1.12.0`. If the bar looks different, replace `docs/images/desktop.png` and `docs/images/terminal.png`.
 2. Add a section for the new version at the top of [CHANGELOG.md](CHANGELOG.md).
 3. Run the check and the tests.
 4. Commit and push.
@@ -241,21 +241,6 @@ claude plugin test .
 
 Users then get the new version with `claude plugin update file-copy-macos` (see [Update](#update)).
 
-### Update the screenshots
-
-The screenshots at the top of this README show a sample project, so they contain no private names or paths.
-
-1. Create the sample project. It goes into `demo` in your clone, which git ignores. It replaces one this script made before, and never touches another folder:
-
-   ```bash
-   scripts/demo-project.sh
-   ```
-
-2. Desktop app: open the `demo` folder of your clone as the folder of a new Code tab session. Make the window about 900 pixels wide.
-3. Terminal: run `cd demo && claude` in the clone, in a window of the standard size, 80 columns and 24 rows (in Terminal: Shell > New Window opens one).
-4. In each, take a window screenshot: press Cmd+Shift+4, then Space, then click the window.
-5. Save them as `docs/images/desktop.png` and `docs/images/terminal.png`, replacing the old ones, and commit.
-
 ### Files
 
 | Path | Content |
@@ -263,7 +248,6 @@ The screenshots at the top of this README show a sample project, so they contain
 | `.claude-plugin/plugin.json` | The mod's manifest |
 | `CHANGELOG.md` | What changed in each version |
 | `docs/images/` | The screenshots in this README |
-| `scripts/demo-project.sh` | Creates the sample project for the screenshots |
 | `.claude-plugin/marketplace.json` | Makes this repository a marketplace |
 | `hooks/register.tsx` | The bar and all actions |
 | `hooks/paths.ts` | Helpers without side effects: path parsing, filtering, sorting, the path shortening, the clock and size formats |

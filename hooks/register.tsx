@@ -226,7 +226,7 @@ const NARROW_COLUMNS = 100
 // one cell less in the desktop's narrower font, and the icon alone in a
 // narrow terminal.
 const LABEL_WIDTH = 11
-const DESKTOP_LABEL_WIDTH = 10
+const DESKTOP_LABEL_WIDTH = 9
 const ICON_LABEL_WIDTH = 2
 
 // The two ways from Finder: files on the clipboard, or their paths as text.
@@ -728,6 +728,49 @@ const showInFinder = async ($: EngineInterface, name: string) => {
   }
 }
 
+// A new Terminal window in the target, running Claude Code. The folder and the
+// program come in as arguments and are quoted by AppleScript, never put into
+// the script.
+const CLAUDE_SCRIPT = [
+  'on run argv',
+  'tell application "Terminal"',
+  'do script "cd " & quoted form of (item 1 of argv) & " && " & quoted form of (item 2 of argv)',
+  'activate',
+  'end tell',
+  'end run',
+]
+
+// Where the installers put the claude program, first match wins: the native
+// installer, the older local install, Homebrew and npm. Run by its full path,
+// it needs no PATH.
+const CLAUDE_PLACES = ['~/.local/bin/claude', '~/.claude/local/claude', '/opt/homebrew/bin/claude', '/usr/local/bin/claude']
+
+const openClaude = async ($: EngineInterface) => {
+  const path = await targetDir($)
+  let program: string | undefined
+
+  for (const place of CLAUDE_PLACES) {
+    const full = await expandHome($, place)
+
+    if (await $.fs.exists(full)) {
+      program = full
+      break
+    }
+  }
+
+  if (program === undefined) {
+    $.ui.toast('Claude Code is not installed for the terminal. See claude.com/claude-code')
+    return
+  }
+
+  const argv = ['/usr/bin/osascript', ...CLAUDE_SCRIPT.flatMap(l => ['-e', l]), path, program]
+  const { exitCode } = await $.process.run(argv)
+
+  if (exitCode !== 0) {
+    $.ui.toast(`Could not open Claude Code in ${shortPath(path)}`)
+  }
+}
+
 // The most results a search shows, and how long it may run.
 const SEARCH_LIMIT = 500
 const SEARCH_SECONDS = 5
@@ -1066,7 +1109,7 @@ const pickAndCopy = async ($: EngineInterface, kind: PickKind) => {
 // time. -x: no camera sound. Like a copy, it shows in Copied and Claude
 // gets a note. The first time, macOS asks to allow Screen Recording for the
 // app that runs Claude Code.
-const takeShot = async ($: EngineInterface) => {
+const takeShot = async ($: EngineInterface, isTerminal: boolean) => {
   const dir = await targetDir($)
   const now = await $.clock.now()
   const offset = await read($, zoneOffset)
@@ -1087,8 +1130,11 @@ const takeShot = async ($: EngineInterface) => {
     // macOS refuses without Screen Recording permission ("could not create
     // image from display"); Esc saves nothing and says nothing.
     if (shot.exitCode !== 0) {
+      // The capture runs inside the app that runs Claude Code: the desktop
+      // app, or the terminal app for a terminal session.
+      const app = isTerminal ? 'your terminal app' : 'Claude'
       $.ui.toast(
-        'Could not take the screenshot. Allow Screen Recording for the app that runs Claude Code: ' +
+        `Could not take the screenshot. Allow Screen Recording for ${app}: ` +
           'System Settings > Privacy & Security > Screen & System Audio Recording.',
       )
     }
@@ -1302,12 +1348,12 @@ export const register: Register = (on, options) => {
     const tickWidth = lines ? TICK_WIDTH : DESKTOP_TICK_WIDTH
     // A narrow terminal (the standard 80 columns leave about 75): the rows'
     // labels and the Source and Content buttons shorten to their icons, so
-    // each row stays on one line. 🧲🖥️ and 🧲⬇️ keep Desktop and Download
+    // each row stays on one line. 🧲🖥️ and 🧲⬇️ keep Desktop and Downloads
     // apart; 👻 .files shows its state by brightness.
     const narrow = lines && e.props.bodyColumns < NARROW_COLUMNS
     const labelWidth = narrow ? ICON_LABEL_WIDTH : lines ? LABEL_WIDTH : DESKTOP_LABEL_WIDTH
     const label = (icon: string, word: string) => (narrow ? icon : `${icon} ${word}:`)
-    // The Target path: what is left of the row after the label and the two
+    // The Target path: what is left of the row after the label and the five
     // buttons (with their padding on the desktop).
     const pathParts = [baseName(root), ...(dir === '' ? [] : dir.split('/'))]
     // The part above the project never changes while one works in it: "…/"
@@ -1315,9 +1361,11 @@ export const register: Register = (on, options) => {
     const path = fitCrumbs(
       '…/',
       pathParts,
-      // The two buttons: "[ ↗️ Open ]" and "[ 📌 Locate ]" with their gaps in
-      // the terminal; about the same with the desktop's padding.
-      e.props.bodyColumns - labelWidth - 1 - 27,
+      // The buttons "[ ↗️ Open ]", "[ 📌 Locate ]", "[ ✴️ Claude ]", "[ 📁 New
+      // folder ]" and "[ 📸 Shot ]" with their gaps in the terminal (narrow:
+      // "[ ✴️ ]", "[ 📁 New ]" and "[ 📸 ]"); about the same with the desktop's
+      // padding.
+      e.props.bodyColumns - labelWidth - 1 - 27 - (narrow ? 25 : 44),
       lines ? 0 : 2,
     )
     // The desktop's buttons have a frame: buttons in rows one above the other
@@ -1354,14 +1402,16 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1} alignItems="center">
-          <Box width={labelWidth}>
+          <Box width={labelWidth} flexShrink={0}>
             <Text>{label('📎', 'Source')}</Text>
           </Box>
-          <Box flexGrow={1}>
+          {/* The desktop draws the field at its own width: a growing box there
+              would leave a gap before the buttons. */}
+          <Box flexGrow={lines ? 1 : 0}>
             <Input
               key={`source-${await read($, fieldId)}`}
               value={startText === '' ? undefined : startText}
-              placeholder={isBusy ? 'Copying...' : 'Paste paths (↵ add)'}
+              placeholder={isBusy ? 'Copying...' : 'Paths ↵'}
               submitLabel="🧲 Add"
               onInput={async (value: string) => {
                 await update($, draft, () => value)
@@ -1421,36 +1471,35 @@ export const register: Register = (on, options) => {
               onPress={() => pasteFromClipboard($)}
             />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` Copy here the files you copied in Finder with Cmd+C `}</Text>
+              <Text inverse>{` Copy files you copied in Finder with Cmd+C `}</Text>
             </Box>
           </Box>
-          <Button key="shot" label={narrow ? '📸' : '📸 Shot'} onPress={() => takeShot($)} />
           <Box key="tip:latest-desktop">
             <Button key="latest-desktop" label={narrow ? '🧲🖥️' : '🧲 Desktop'} onPress={() => copyNewestFrom($, 'Desktop')} />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` Copy here the newest item of ~/Desktop, for example a screenshot `}</Text>
+              <Text inverse>{` Copy newest item of ~/Desktop, for example a screenshot `}</Text>
             </Box>
           </Box>
           <Box key="tip:latest-download">
             <Button
               key="latest-download"
-              label={narrow ? '🧲⬇️' : '🧲 Download'}
+              label={narrow ? '🧲⬇️' : '🧲 Downloads'}
               onPress={() => copyNewestFrom($, 'Downloads')}
             />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` Copy here the newest item of ~/Downloads `}</Text>
+              <Text inverse>{` Copy newest item of ~/Downloads `}</Text>
             </Box>
           </Box>
         </Box>
         {message !== null && (
           <Box flexDirection="row" gap={1}>
-            <Box width={labelWidth} />
+            <Box width={labelWidth} flexShrink={0} />
             <Text color="yellow">{message}</Text>
           </Box>
         )}
         {count > 0 && (
           <Box flexDirection="row" gap={1}>
-            <Box width={labelWidth} />
+            <Box width={labelWidth} flexShrink={0} />
             <Box flexDirection="column" flexGrow={1}>
               {paths.map(path => (
                 <Button
@@ -1464,7 +1513,7 @@ export const register: Register = (on, options) => {
           </Box>
         )}
         <Box flexDirection="row" gap={1} marginTop={rowSpace}>
-          <Box width={labelWidth}>
+          <Box width={labelWidth} flexShrink={0}>
             <Text>{label('🎯', 'Target')}</Text>
           </Box>
           {/* The path: the part above the project as text, then one button per
@@ -1496,9 +1545,19 @@ export const register: Register = (on, options) => {
           {/* Real buttons, as Files and Folder in the row above. */}
           <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
           <Button key="finder-target" label="📌 Locate" onPress={() => showInFinder($, '')} />
+          <Button key="claude-target" label={narrow ? '✴️' : '✴️ Claude'} onPress={() => openClaude($)} />
+          {/* Both make something new in the target. */}
+          {!naming && (
+            <Button
+              key="new-folder"
+              label={narrow ? '📁 New' : '📁 New folder'}
+              onPress={() => update($, isNamingFolder, () => true)}
+            />
+          )}
+          <Button key="shot" label={narrow ? '📸' : '📸 Shot'} onPress={() => takeShot($, lines)} />
         </Box>
         <Box flexDirection="row" gap={1} marginTop={rowSpace}>
-          <Box width={labelWidth}>
+          <Box width={labelWidth} flexShrink={0}>
             <Text>{label('📚', 'Content')}</Text>
           </Box>
           <Button
@@ -1513,14 +1572,6 @@ export const register: Register = (on, options) => {
             plain
             onPress={() => toggleList($)}
           />
-          {!naming && (
-            <Button
-              key="new-folder"
-              label={narrow ? '🗂️ New' : '🗂️ New folder'}
-              plain
-              onPress={() => update($, isNamingFolder, () => true)}
-            />
-          )}
           <Button
             key="dotfiles"
             label={narrow ? '👻 .files' : showDots ? '👻 Hide .files' : '👻 Show .files'}
@@ -1528,12 +1579,15 @@ export const register: Register = (on, options) => {
             dimColor={!showDots}
             onPress={() => toggleDotfiles($)}
           />
+          {/* The terminal draws a field's label with no space before the text
+              ("Filter:Name"), so there the label is a Text of its own. */}
+          {lines && <Text>Filter:</Text>}
           {/* The terminal draws the field as wide as its box; the desktop at its
               own width, so a fixed box there would push Clear away. */}
-          <Box width={lines ? (narrow ? 24 : 38) : undefined}>
+          <Box width={lines ? (narrow ? 16 : 30) : undefined}>
             <Input
               key={`filter-${await read($, filterId)}`}
-              label="Filter"
+              label={lines ? undefined : 'Filter'}
               placeholder="Name (↵ recursive)"
               submitLabel="🔍 Find"
               onInput={(value: string) => filterBy($, value)}
@@ -1567,15 +1621,15 @@ export const register: Register = (on, options) => {
         </Box>
         {naming && (
           <Box flexDirection="row" gap={1}>
-            <Box width={labelWidth} />
+            <Box width={labelWidth} flexShrink={0} />
             <Box flexDirection="column" flexGrow={1}>
               <Box flexDirection="row" gap={1}>
                 <Box flexGrow={1}>
                   <Input
                     key="folder-name"
-                    label="🗂️ New folder"
+                    label="📁 New folder"
                     placeholder="Name, then Enter"
-                    submitLabel="🗂️ Create"
+                    submitLabel="📁 Create"
                     autoFocus
                     onInput={() => (nameError === null ? undefined : update($, folderError, () => null))}
                     onSubmit={(value: string) => createFolder($, value)}
@@ -1865,7 +1919,7 @@ export const register: Register = (on, options) => {
           </Box>
         )}
         <Box flexDirection="row" gap={1}>
-          <Box width={labelWidth}>
+          <Box width={labelWidth} flexShrink={0}>
             <Text>{label('💡', 'Finder')}</Text>
           </Box>
           {/* A keyed Box: pointing at the short tip explains it in words. */}
@@ -1904,7 +1958,7 @@ export const register: Register = (on, options) => {
         </Box>
         {ask !== null && (
           <Box flexDirection="row" gap={1}>
-            <Box width={labelWidth}>
+            <Box width={labelWidth} flexShrink={0}>
               <Text color="yellow">{label('⚠', 'Exists')}</Text>
             </Box>
             <Box flexDirection="column" flexGrow={1} flexShrink={1}>
@@ -1922,7 +1976,7 @@ export const register: Register = (on, options) => {
         )}
         {showResult && result.copied.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={labelWidth}>
+            <Box width={labelWidth} flexShrink={0}>
               <Text color="green">{label('✅', 'Copied')}</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
@@ -1942,7 +1996,7 @@ export const register: Register = (on, options) => {
         )}
         {showResult && confirmingLast && result.copied.length > 0 && (
           <Box flexDirection="row" gap={1}>
-            <Box width={labelWidth} />
+            <Box width={labelWidth} flexShrink={0} />
             <Box flexDirection="column" flexGrow={1}>
               <Text color="yellow">
                 {result.copied.length === 1
@@ -1969,7 +2023,7 @@ export const register: Register = (on, options) => {
         )}
         {showResult && result.skipped.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={labelWidth}>
+            <Box width={labelWidth} flexShrink={0}>
               <Text dimColor>{label('⏭️', 'Skipped')}</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
@@ -1982,7 +2036,7 @@ export const register: Register = (on, options) => {
         )}
         {showResult && result.failed.length > 0 && (
           <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={labelWidth}>
+            <Box width={labelWidth} flexShrink={0}>
               <Text color="yellow">{label('⚠', 'Failed')}</Text>
             </Box>
             <Box flexGrow={1} flexShrink={1}>
