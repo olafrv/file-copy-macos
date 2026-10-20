@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.22.2
+
+- The bar shows only in the terminal and in the desktop app. It no longer appears in the VS Code extension, whose panel is too narrow for it, or on any other surface.
+
 ## 1.22.1
 
 - README: new screenshots that show 🧲 Downloads and "Filter: Name".
