@@ -22,7 +22,7 @@ claude plugin marketplace add olafrv/file-copy-macos
 claude plugin install file-copy-macos@file-copy-macos
 ```
 
-The bar appears in every Claude Code session started after the install, in the terminal and in the Code tab of the Claude desktop app.
+The bar appears in every Claude Code session started after the install, in the terminal and in the Code tab of the Claude desktop app. It does not appear in the VS Code extension (its panel is too narrow for the bar) or in the mobile app.
 
 You can also install it from inside a Claude Code terminal session with one line. Answer `y` to "Add marketplace?", then press Enter:
 

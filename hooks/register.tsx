@@ -1263,8 +1263,9 @@ export const register: Register = (on, options) => {
       return next(e)
     }
 
-    // Mobile draws no Input; the band needs one.
-    if (e.surface === 'mobile') {
+    // Only where the bar is made and tested: the terminal and the desktop app.
+    // Mobile draws no Input; VS Code's panel is too narrow for the rows.
+    if (e.surface !== 'terminal' && e.surface !== 'desktop') {
       return next(e)
     }
 

@@ -674,6 +674,24 @@ test('✴️ Claude opens Claude Code in a new Terminal window in the target', a
   await ui.unmount()
 })
 
+test('the bar shows only in the terminal and the desktop app, not in VS Code or on mobile', async ($, on) => {
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, () => [])
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    expect(await ui.find({ key: 'pick' })).toBeDefined()
+    await ui.unmount()
+  }
+
+  // Elsewhere the mod passes the render on and draws nothing; with no other
+  // plugin there is then nothing to mount.
+  for (const surface of ['vscode', 'mobile'] as const) {
+    await expect($.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })).rejects.toThrow('no implementation for ui.render')
+  }
+})
+
 test('sizes read as Finder shows them', async () => {
   expect(humanSize(0)).toBe('0 bytes')
   expect(humanSize(1)).toBe('1 byte')
