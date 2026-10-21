@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.24.0
+
+- New row action **📅 Date**, after 📝 Ren: it opens the rename field with the time of the click before the name (`2026-10-21_221537 - report.pdf`). Enter renames, ⏹️ Cancel keeps the name. For ticked items it asks first, then gives all of them the same time; names that already have such a date stay as they are.
+- A click on the clock copies the time as the start of a file name: `2026-10-21_221537 - `.
+- Folders show their number of items in the Size column (`3 items`, `1 item`, `Empty`), counted as Finder does.
+- Desktop: the table has thin lines between the columns and under the header, like the terminal.
+- ✴️ Claude opens the Terminal window at 110 columns and 35 rows, so the bar has room.
+- Desktop: ⏹️ Cancel sits right after the rename and new-folder fields.
+- README: new screenshots.
+
 ## 1.23.1
 
 - The **💤 Tips** switch is back, after the 💡 Finder tip. It turns the help tips of 📋 Paste, 🧲 Desktop, 🧲 Downloads and the 💡 Finder tip on (**✅ Tips**) and off. Off by default; the mod remembers your choice.
