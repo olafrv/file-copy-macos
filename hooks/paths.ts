@@ -113,6 +113,11 @@ export const baseName = (path: string): string =>
 export const toFieldText = (paths: readonly string[]): string =>
   paths.map(path => path.replace(/[\\'"]/g, c => `\\${c}`)).join(' ')
 
+// A folder's number of items, in the Size column's 9 cells: "Empty",
+// "1 item", "3 items", "999+ items".
+export const itemCount = (count: number): string =>
+  count === 0 ? 'Empty' : count === 1 ? '1 item' : count > 999 ? '999+ items' : `${count} items`
+
 // A size as Finder shows it: 1 KB is 1000 bytes; one decimal below 10.
 export const humanSize = (bytes: number): string => {
   const units = ['bytes', 'KB', 'MB', 'GB', 'TB']
@@ -225,6 +230,28 @@ export const formatClock = (ms: number, offset: number, zone: string): string =>
   return (
     `${two(d.getUTCDate())}.${two(d.getUTCMonth() + 1)}.${d.getUTCFullYear()} ` +
     `${two(d.getUTCHours())}:${two(d.getUTCMinutes())} ${zone}`
+  )
+}
+
+const NAME_PREFIX = /^\d{4}-\d{2}-\d{2}_\d{6} - /
+
+/** Whether a name already starts with a namePrefix ("2026-10-13_143215 - "). */
+export const hasNamePrefix = (name: string): boolean => NAME_PREFIX.test(name)
+
+/** A name with `prefix` before it, in place of the date it may have already. */
+export const withNamePrefix = (name: string, prefix: string): string => `${prefix}${name.replace(NAME_PREFIX, '')}`
+
+/**
+ * A moment as the start of a file name, "2026-10-13_143215 - ", in the zone
+ * given: what a click on the clock copies, so a name can be typed after it.
+ */
+export const namePrefix = (ms: number, offset: number): string => {
+  const d = new Date(ms + offset * 60_000)
+  const two = (n: number) => String(n).padStart(2, '0')
+
+  return (
+    `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())}_` +
+    `${two(d.getUTCHours())}${two(d.getUTCMinutes())}${two(d.getUTCSeconds())} - `
   )
 }
 

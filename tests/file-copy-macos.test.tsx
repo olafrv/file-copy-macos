@@ -8,6 +8,10 @@ import {
   fitCrumbs,
   formatClock,
   humanSize,
+  itemCount,
+  hasNamePrefix,
+  namePrefix,
+  withNamePrefix,
   isSafeEntry,
   shotName,
   isHiddenEntry,
@@ -461,6 +465,85 @@ test('Content opens folders, makes them the target and creates new ones', async 
   expect(JSON.stringify(fyi)).toContain('created the folder /proj/docs/2026')
 })
 
+test('📅 Date fills the rename field with the click time; ticked items are asked first', async ($, on) => {
+  mock.session(on)
+  const toasts: string[] = []
+  let folder: string[] = []
+  const moves: (readonly string[])[] = []
+
+  on('ui.toast', ($, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
+  on('session.root', () => ({ value: '/proj' }))
+  // 12:32:15 UTC; no zone read here, so the prefix is in UTC.
+  on('clock.now', () => ({ value: Date.UTC(2026, 9, 13, 12, 32, 15) }))
+  fakeFs(on, dir => (dir === '/proj' ? folder : dir === '/proj/docs' && folder.includes('docs/') ? [] : undefined))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/bin/mv') {
+      moves.push(e.argv)
+      const from = (e.argv[2] ?? '').slice('/proj/'.length)
+      const to = (e.argv[3] ?? '').slice('/proj/'.length)
+      folder = folder.map(n => (n === from ? to : n === `${from}/` ? `${to}/` : n))
+    }
+
+    return { value: ran('') }
+  })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    folder = ['docs/', 'a.pdf', '2026-01-02_030405 - old.txt', '2026-10-13_123215 - b.pdf', 'b.pdf']
+    moves.length = 0
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND, props: { ...BAND.props, maxRows: 30 } })
+    await ui.press({ key: 'list' })
+
+    // One row: the rename field opens with the date before the name; nothing
+    // moves until Enter, and Cancel leaves the name.
+    await ui.press({ key: 'date:a.pdf' })
+    expect((await ui.find({ key: 'rename-field:a.pdf' }))?.props.value).toBe('2026-10-13_123215 - a.pdf')
+    await ui.press({ key: 'cancel-rename' })
+    expect(moves).toEqual([])
+    await ui.press({ key: 'date:a.pdf' })
+    await ui.input({ key: 'rename-field:a.pdf', text: '2026-10-13_123215 - a.pdf' })
+    expect(moves).toEqual([['/bin/mv', '-n', '/proj/a.pdf', '/proj/2026-10-13_123215 - a.pdf']])
+    expect(await ui.find({ key: 'file:2026-10-13_123215 - a.pdf' })).toBeDefined()
+
+    // A date already: the field shows the new time in place of the old one.
+    await ui.press({ key: 'date:2026-01-02_030405 - old.txt' })
+    expect((await ui.find({ key: 'rename-field:2026-01-02_030405 - old.txt' }))?.props.value).toBe(
+      '2026-10-13_123215 - old.txt',
+    )
+    await ui.press({ key: 'cancel-rename' })
+    // A new name that exists: refused, as for 📝 Ren.
+    await ui.press({ key: 'date:b.pdf' })
+    await ui.input({ key: 'rename-field:b.pdf', text: '2026-10-13_123215 - b.pdf' })
+    expect(await ui.find({ type: 'Text', text: '"2026-10-13_123215 - b.pdf" already exists here.' })).toBeDefined()
+    await ui.press({ key: 'cancel-rename' })
+    expect(moves.length).toBe(1)
+
+    // Ticked items: asked first; then all with the same time, a folder too, and
+    // a name with a date already stays.
+    await ui.press({ key: 'tick:docs/' })
+    await ui.press({ key: 'tick:2026-01-02_030405 - old.txt' })
+    await ui.press({ key: 'date-selected' })
+    expect(await ui.find({ type: 'Text', text: 'Add the date and time before the name of 2 files and 1 folder?' })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: 'Add the date and time before the name of 1 file and 1 folder?' })).toBeDefined()
+    await ui.press({ key: 'cancel-date' })
+    expect(moves.length).toBe(1)
+    await ui.press({ key: 'date-selected' })
+    await ui.press({ key: 'confirm-date' })
+    expect(moves.at(-1)).toEqual(['/bin/mv', '-n', '/proj/docs', '/proj/2026-10-13_123215 - docs'])
+    expect(toasts.at(-1)).toBe('Renamed to "2026-10-13_123215 - docs". "2026-01-02_030405 - old.txt" has a date already')
+    expect(await ui.find({ key: 'dir:2026-10-13_123215 - docs/' })).toBeDefined()
+    await ui.press({ key: 'list' })
+    await ui.unmount()
+  }
+
+  expect(hasNamePrefix('2026-10-13_123215 - a.pdf')).toBe(true)
+  expect(hasNamePrefix('2026-10-13 - 123215 - Screenshot.png')).toBe(false)
+  expect(namePrefix(Date.UTC(2026, 9, 13, 12, 32, 15), 120)).toBe('2026-10-13_143215 - ')
+  expect(withNamePrefix('2026-01-02_030405 - old.txt', '2026-10-13_143215 - ')).toBe('2026-10-13_143215 - old.txt')
+})
+
 test('Content renames a file, never over another one', async ($, on) => {
   const session = mock.session(on)
   let folder = ['a.pdf', 'b.pdf']
@@ -705,21 +788,46 @@ test('sizes read as Finder shows them', async () => {
   expect(humanSize(3_400_000_000)).toBe('3.4 GB')
 })
 
-test('Content shows each file size and none for folders', async ($, on) => {
+test('Content shows each file size, and each folder its number of items', async ($, on) => {
+  on('store.set', () => ({ value: undefined }))
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
-  fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf', 'My File.txt'] : undefined), {
+  const tree: Record<string, string[]> = {
+    '/proj': ['docs/', 'empty/', 'one/', 'a.pdf', 'My File.txt'],
+    '/proj/docs': ['a.md', 'b.md', '.env', '.DS_Store', 'old/'],
+    '/proj/empty': [],
+    '/proj/one': ['x.txt'],
+  }
+  fakeFs(on, dir => tree[dir], {
     '/proj/a.pdf': 13422,
     '/proj/My File.txt': 512,
   })
 
-  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  // Rows for all five items on one page.
+  const ui = await $.ui.mount({
+    plugin: 'file-copy-macos',
+    surface: 'desktop',
+    ...BAND,
+    props: { ...BAND.props, maxRows: 30 },
+  })
   await ui.press({ key: 'list' })
   expect(await ui.find({ type: 'Text', text: '13 KB' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '512 bytes' })).toBeDefined()
   expect((await ui.findAll({ type: 'Text', text: /bytes$|KB$/ })).length).toBe(2)
+  // The first level only, without .DS_Store; ".env" counts once .files show.
+  expect(await ui.find({ type: 'Text', text: '3 items' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Empty' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '1 item' })).toBeDefined()
+  await ui.press({ key: 'dotfiles' })
+  expect(await ui.find({ type: 'Text', text: '4 items' })).toBeDefined()
+  await ui.press({ key: 'dotfiles' })
   await ui.press({ key: 'list' })
   await ui.unmount()
+
+  expect(itemCount(0)).toBe('Empty')
+  expect(itemCount(1)).toBe('1 item')
+  expect(itemCount(999)).toBe('999 items')
+  expect(itemCount(1000)).toBe('999+ items')
 })
 
 test('the desktop band links the version to the README, the terminal has no link', async ($, on) => {
@@ -961,10 +1069,10 @@ test('Content is a table: header, tick, name, size and actions per row', async (
     const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
     expect(label.endsWith('…')).toBe(true)
     // The table takes the whole width (100). In the terminal tick (2), size
-    // (9), actions (39), padding and frame (10) and 3 column lines leave 37
+    // (9), actions (47), padding and frame (10) and 3 column lines leave 29
     // for the name; on the desktop tick (5, no padding), size, actions,
-    // padding and frame (8) leave 39.
-    const nameWidth = surface === 'terminal' ? 37 : 39
+    // padding and frame (8) leave 31.
+    const nameWidth = surface === 'terminal' ? 29 : 31
     expect([...label].length + 1).toBe(nameWidth)
 
     // A frame on both; column lines and a header line in the terminal only,
@@ -1151,7 +1259,17 @@ test('the clock reads the zone from macOS and shows date, time and zone', async 
   expect(formatClock(Date.UTC(2026, 0, 1, 2, 0), -300, 'EST')).toBe('31.12.2025 21:00 EST')
 })
 
-test('the Finder row shows the clock and the version on both surfaces', async ($, on) => {
+test('the Finder row shows the clock and the version on both surfaces; a click copies the clock', async ($, on) => {
+  const copies: { text: string; surface?: string }[] = []
+  const toasts: string[] = []
+  on('ui.toast', ($, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
+  on('ui.copy', ($, e) => {
+    copies.push({ text: e.text, surface: e.surface })
+    return { value: { isCopied: true } }
+  })
   on('session.root', () => ({ value: '/proj' }))
   on('clock.now', () => ({ value: Date.UTC(2026, 9, 13, 12, 32, 15) }))
   on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/date' ? '+0200 CEST\n' : '') }))
@@ -1162,19 +1280,20 @@ test('the Finder row shows the clock and the version on both surfaces', async ($
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: '13.10.2026 14:32 CEST' })).toBeDefined()
-    // On the desktop a middle dot, then the version as a link, all in the
-    // clock's own Text, so no gap of the row widens the space before the dot.
+    // The clock is a plain button; a middle dot and the version follow in one
+    // Text, in a Box with no gap, so no gap of the row widens the space.
+    expect((await ui.find({ key: 'clock' }))?.props.label).toBe('13.10.2026 14:32 CEST')
     const version = await ui.find({ type: 'Link' })
     expect(version?.children).toEqual(surface === 'desktop' ? ['v9.8.7'] : undefined)
-    const clock = await ui.find({ type: 'Text', text: '13.10.2026 14:32 CEST' })
-    const parts = (clock?.children ?? []).filter(c => typeof c === 'string')
+    const after = await ui.find({ type: 'Text', text: /^ · / })
+    const parts = (after?.children ?? []).filter(c => typeof c === 'string')
     // The terminal shows the version as plain text after the dot.
-    expect(parts).toEqual(
-      surface === 'desktop'
-        ? ['13.10.2026 14:32 CEST', ' · ']
-        : ['13.10.2026 14:32 CEST', ' · ', 'v9.8.7'],
-    )
+    expect(parts).toEqual(surface === 'desktop' ? [' · '] : [' · ', 'v9.8.7'])
+
+    await ui.press({ key: 'clock' })
+    // Copied as the start of a file name: year first, so it sorts.
+    expect(copies.at(-1)).toEqual({ text: '2026-10-13_143215 - ', surface })
+    expect(toasts.at(-1)).toBe('Copied "2026-10-13_143215 - "')
     await ui.unmount()
   }
 })

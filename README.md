@@ -76,7 +76,7 @@ The mod is for macOS only, because it uses these macOS commands:
 | Command | Used for |
 | --- | --- |
 | `/bin/sh` with `cp -R` | Copying into the project, and the "name 2" rule for Keep both |
-| `/bin/mv` | 📝 Ren |
+| `/bin/mv` | 📝 Ren and 📅 Date |
 | `/bin/mkdir` | 📁 New folder |
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
 | `/usr/bin/open` | ↗️ Open and 📌 Locate |
@@ -119,7 +119,7 @@ If a name already exists in the target, the mod asks first:
 - **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. The path starts at the project folder (`…/my-project/docs`); point at it to see the full path. If it is still too long, the folders in the middle become "…". **↗️ Open** opens the target folder in Finder.
 - **📁 New folder** creates a folder in the target and opens it.
 - **📸 Shot** takes a screenshot straight into the target: drag an area, or press Space and click a window; Esc cancels. The image is named by the local time, for example `2026-10-16 - 173756 - Screenshot.png`. It needs the macOS **Screen Recording** permission (System Settings > Privacy & Security > Screen & System Audio Recording) for the app that runs Claude Code: for the desktop app the entry **Claude** ("Claude Desktop" alone may not be enough), for a terminal session your terminal app. Quit and reopen the app after turning it on. Without it, a toast says the screenshot could not be taken.
-- **✴️ Claude** opens a new Terminal window in the target and starts Claude Code there (it looks for the `claude` program in the usual install folders; if there is none, a toast says so). It always uses the Terminal app, also from the desktop app. The first time, macOS asks whether Claude (or your terminal app) may control Terminal: allow it. To change it later: System Settings > Privacy & Security > Automation.
+- **✴️ Claude** opens a new Terminal window of 110 columns and 35 rows (so the bar has room) in the target and starts Claude Code there (it looks for the `claude` program in the usual install folders; if there is none, a toast says so). It always uses the Terminal app, also from the desktop app. The first time, macOS asks whether Claude (or your terminal app) may control Terminal: allow it. To change it later: System Settings > Privacy & Security > Automation.
 - **📌 Locate** shows the target folder in its parent folder, selected.
 - **🏷️ Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🫣 Hide**.
 - **🔍 Find** (or Enter) searches the target folder and all folders below it. The table then gets a **Folder** column with each item's folder. Point at a folder there to see its full path; a click opens it. All actions work on the items found, and 📝 Ren keeps an item in its own folder. Typing in the filter again, 🧹 Clear or opening a folder ends the search.
@@ -130,14 +130,15 @@ If a name already exists in the target, the mod asks first:
 - **♻️ Refresh** reads the list again, for changes made outside the bar (for example in Finder). During a search it runs the search again.
 - The content of the target shows when a session starts; **🫣 Hide** closes it and **👁️ Show** opens it again.
 - Names that start with "." (for example `.env` or `.claude`) are hidden, as in Finder. **👻 Show .files** shows them, in the list and in search results; **👻 Hide .files** hides them again. The mod remembers your choice.
-- The content is a framed table with the columns tick box, Name, Size and Actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…". The terminal also draws lines between the columns and under the header.
+- The content is a framed table with the columns tick box, Name, Size and Actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…". Lines separate the columns and the header. For a folder, Size shows its number of items, as Finder counts them (only the first level, and names starting with "." only while 👻 .files is on): for example `3 items`, `1 item` or `Empty`. Search results show no count.
 - Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - Click **Name** or **Size** (and **Folder** during a search) in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
 - The list shows 4 to 10 items per page: as many as fit, so the bar does not need to scroll. In a larger terminal window you see more items. The desktop app gives the bar less room, so it usually shows 4. Use **◀** and **▶** at the end of the 🏷️ Filter row to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
-- Each row has five actions:
+- Each row has six actions:
   - **↗️ Open:** opens a file in its default macOS app, a folder in Finder.
   - **📝 Ren:** renames the item.
+  - **📅 Date:** opens the rename field with the time of the click before the name, as a click on the clock copies it: `report.pdf` becomes `2026-10-21_221537 - report.pdf`. Press Enter to rename, or ⏹️ Cancel. A date the name already has is replaced by the new one.
   - **💬 Ask:** see below.
   - **📋 Copy:** puts the item on the clipboard as a file. Press Cmd+V in Finder, on the Desktop, in Mail or in Slack to paste it.
   - **📌 Locate:** opens Finder at the item's folder with the item selected. From there you can drag it.
@@ -145,12 +146,13 @@ If a name already exists in the target, the mod asks first:
 - Tick files or folders (☐, on the desktop ⬜). The tick box in the header ticks all items that match the filter, on all pages; a second click unticks them.
 - With items ticked, a row under the table offers:
   - **❌ Delete:** moves them to the Trash. A folder goes to the Trash with all its contents.
+  - **📅 Date:** asks first, then puts the same time before all their names. Names that already start with such a date stay as they are, and an item is never overwritten.
   - **💬 Ask:** puts all of them into the prompt.
   - **📋 Copy:** puts them on the clipboard as files. Press Cmd+V in Finder, on the Desktop, in Mail or in Slack to paste them. This replaces drag and drop, which the mod cannot offer.
 
 ### Clock
 
-The Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`. It changes on each full minute. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. The version of the mod follows the clock after a middle dot. On the desktop it is a link to this README.
+The Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`. It changes on each full minute. Click it to copy the date and time as the start of a file name, `2026-10-13_143215 - `, so you can paste it and type the name after it. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. The version of the mod follows the clock after a middle dot. On the desktop it is a link to this README.
 
 ### What Claude is told
 

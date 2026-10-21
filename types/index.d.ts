@@ -35,6 +35,7 @@ declare module 'claude-code' {
       isListOpen: boolean
       entries: string[]
       sizes: { [name: string]: number }
+      counts: { [name: string]: { all: number; shown: number } }
       selected: string[]
       isConfirming: boolean
       page: number
@@ -50,6 +51,8 @@ declare module 'claude-code' {
       isNamingFolder: boolean
       folderError: string | null
       renaming: string | null
+      renameValue: string | null
+      isConfirmingDate: boolean
       renameError: string | null
     }
   }

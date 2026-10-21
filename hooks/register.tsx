@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Olaf Reitmaier
 
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 
 import type { CopyResult, Pending, SortKey } from '../types'
 import {
@@ -15,7 +15,11 @@ import {
   pageSizeFor,
   fitStart,
   formatClock,
+  namePrefix,
+  hasNamePrefix,
+  withNamePrefix,
   humanSize,
+  itemCount,
   parsePaths,
   isSafeEntry,
   parseSkipList,
@@ -55,6 +59,9 @@ const isListOpen = atom({ plugin: 'file-copy-macos', key: 'isListOpen' } as cons
 const entries = atom({ plugin: 'file-copy-macos', key: 'entries' } as const, [])
 // Each file's size in bytes, by name; folders have none.
 const sizes = atom({ plugin: 'file-copy-macos', key: 'sizes' } as const, {})
+// Each folder's number of items, by its name ("docs/"): all of them, and those
+// shown with .files hidden, so the 👻 switch needs no new listing.
+const counts = atom({ plugin: 'file-copy-macos', key: 'counts' } as const, {})
 const selected = atom({ plugin: 'file-copy-macos', key: 'selected' } as const, [])
 const isConfirming = atom({ plugin: 'file-copy-macos', key: 'isConfirming' } as const, false)
 // The page of the file list on show, 0 for the first.
@@ -80,6 +87,10 @@ const folderError = atom({ plugin: 'file-copy-macos', key: 'folderError' } as co
 // The file in Content whose name is being edited, and what was wrong with
 // the new name.
 const renaming = atom({ plugin: 'file-copy-macos', key: 'renaming' } as const, null)
+// The text the rename field starts with, when not the name itself (📅 Date).
+const renameValue = atom({ plugin: 'file-copy-macos', key: 'renameValue' } as const, null)
+// Whether the row under the table asks before 📅 Date renames the ticked items.
+const isConfirmingDate = atom({ plugin: 'file-copy-macos', key: 'isConfirmingDate' } as const, false)
 const renameError = atom({ plugin: 'file-copy-macos', key: 'renameError' } as const, null)
 const isHidden = atom({ plugin: 'file-copy-macos', key: 'isHidden' } as const, false)
 // Whether the list shows hidden names (starting with "."), as Finder's
@@ -190,16 +201,22 @@ const HELP_URL = 'https://github.com/olafrv/file-copy-macos#readme'
 // darkens a light one alike.
 const ROW_STRIPE = 'userMessageBackground'
 const DESKTOP_STRIPE = '#8080801f'
+// The desktop's grid lines: a see-through gray, like the stripes, that works
+// in light and dark mode.
+const DESKTOP_GRID = '#80808059'
+// About a pixel each: a row is about twice as high as a cell is wide.
+const GRID_LINE = 0.15
+const GRID_ROW_LINE = 0.07
 const DESKTOP_HOVER = '#80808038'
 
 // The file list's columns, in terminal cells: the tick box, the size
-// ("999 KB"), the actions ("↗️ Open 📌 Locate 💬 Ask 📝 Ren 📋 Copy") and the least
-// the name gets.
+// ("999 KB"), the actions ("↗️ Open 📝 Ren 📅 Date 💬 Ask 📋 Copy 📌 Locate") and
+// the least the name gets.
 const TICK_WIDTH = 2
 // The desktop draws a Button with its own padding: the tick box needs more room.
 const DESKTOP_TICK_WIDTH = 5
 const SIZE_WIDTH = 9
-const ACTIONS_WIDTH = 39
+const ACTIONS_WIDTH = 47
 const MIN_NAME_WIDTH = 16
 
 // An icon and a name cut to `width` cells with "…"; the icon takes 2 cells.
@@ -383,11 +400,26 @@ const loadEntries = async ($: EngineInterface) => {
     }
   }
 
+  // The first level of each folder, as Finder counts; a folder that cannot be
+  // read gets no count.
+  const folders = shown.filter(e => e.kind === 'dir')
+  const inside = await Promise.all(folders.map(e => $.fs.list(`${dir}/${e.name}`).catch(() => null)))
+  const items: { [name: string]: { all: number; shown: number } } = {}
+
+  folders.forEach((e, i) => {
+    const kept = (inside[i] ?? []).filter(n => n.name !== '.DS_Store' && isSafeEntry(n.name))
+
+    if (inside[i] !== null) {
+      items[`${e.name}/`] = { all: kept.length, shown: kept.filter(n => !isHiddenEntry(n.name)).length }
+    }
+  })
+
   const hits = (await read($, searchHits)) ?? []
 
   await update($, entries, () => names)
   await update($, selected, list => list.filter(name => names.includes(name) || hits.includes(name)))
   await update($, sizes, () => bytes)
+  await update($, counts, () => items)
 }
 
 // Each file's size in bytes, by its name or path below `dir`; folders have none.
@@ -464,6 +496,7 @@ const openFolder = async ($: EngineInterface, dir: string) => {
   await clearFilter($)
   await update($, selected, () => [])
   await update($, isConfirming, () => false)
+  await update($, isConfirmingDate, () => false)
   await update($, isNamingFolder, () => false)
   await startRename($, null)
   await loadEntries($)
@@ -501,9 +534,18 @@ const openWithDefaultApp = async ($: EngineInterface, name: string) => {
   }
 }
 
-const startRename = async ($: EngineInterface, name: string | null) => {
+const startRename = async ($: EngineInterface, name: string | null, value: string | null = null) => {
   await update($, renameError, () => null)
+  await update($, renameValue, () => value)
   await update($, renaming, () => name)
+}
+
+// 📅 Date on one row: the rename field opens with the click time before the
+// name, so Enter confirms it and a click by mistake changes nothing.
+const startDate = async ($: EngineInterface, name: string) => {
+  const prefix = namePrefix(await $.clock.now(), await read($, zoneOffset))
+
+  await startRename($, name, withNamePrefix(entryName(name).replace(/\/$/, ''), prefix))
 }
 
 // Renames a file or folder of the target, or, in a search, below it. Never
@@ -551,9 +593,19 @@ const renameFile = async ($: EngineInterface, entry: string, raw: string) => {
     return
   }
 
+  await startRename($, null)
+  await followRename($, dir, entry, toPath)
+  await loadEntries($)
+  $.ui.toast(`Renamed ${oldName} to ${to}`)
+}
+
+// After a rename: ticks, search results, the Copied line and Claude follow the
+// new name.
+const followRename = async ($: EngineInterface, dir: string, entry: string, toPath: string) => {
+  const isFolder = entry.endsWith('/')
+  const from = entry.replace(/\/$/, '')
   const newEntry = isFolder ? `${toPath}/` : toPath
 
-  await startRename($, null)
   await update($, selected, list => list.map(n => (n === entry ? newEntry : n)))
   await update($, searchHits, hits => (hits === null ? null : hits.map(h => (h === entry ? newEntry : h))))
   await update($, searchSizes, bytes =>
@@ -565,8 +617,66 @@ const renameFile = async ($: EngineInterface, entry: string, raw: string) => {
       : { ...result, copied: result.copied.map(n => (n === from ? toPath : n)) },
   )
   await tellClaudeRename($, dir, from, toPath, isFolder)
+}
+
+// 📅 Date for the ticked items, once confirmed: the time of the confirmation
+// before each name ("2026-10-13_143215 - report.pdf"), the same text a click
+// on the clock copies. A name that has one already, or whose new name exists,
+// stays as it is; an item is never overwritten.
+const addDate = async ($: EngineInterface, list: readonly string[]) => {
+  const dir = await targetDir($)
+  const prefix = namePrefix(await $.clock.now(), await read($, zoneOffset))
+  // The new names, and the entries left as they were ("docs/" counts as a
+  // folder).
+  const renamed: string[] = []
+  const dated: string[] = []
+  const failed: string[] = []
+
+  for (const entry of list) {
+    const from = entry.replace(/\/$/, '')
+    const parent = entryFolder(entry)
+    const oldName = entryName(entry).replace(/\/$/, '')
+
+    if (hasNamePrefix(oldName)) {
+      dated.push(entry)
+      continue
+    }
+
+    const to = `${prefix}${oldName}`
+    const toPath = parent === '' ? to : `${parent}/${to}`
+
+    if (await $.fs.exists(`${dir}/${toPath}`)) {
+      failed.push(entry)
+      continue
+    }
+
+    const moved = await $.process.run(['/bin/mv', '-n', `${dir}/${from}`, `${dir}/${toPath}`])
+    // macOS `mv -n` exits 0 even when it skipped the move: check the old name is gone.
+    if (moved.exitCode !== 0 || (await $.fs.exists(`${dir}/${from}`))) {
+      failed.push(entry)
+      continue
+    }
+
+    await followRename($, dir, entry, toPath)
+    renamed.push(entry.endsWith('/') ? `${to}/` : to)
+  }
+
   await loadEntries($)
-  $.ui.toast(`Renamed ${oldName} to ${to}`)
+
+  const one = (list: readonly string[]) => `"${entryName(list[0] ?? '').replace(/\/$/, '')}"`
+  const notes = [
+    renamed.length === 1
+      ? `Renamed to ${one(renamed)}`
+      : renamed.length > 1
+        ? `Added the date to ${countItems(renamed)}`
+        : null,
+    dated.length > 0 ? `${dated.length === 1 ? `${one(dated)} has` : `${countItems(dated)} have`} a date already` : null,
+    failed.length > 0
+      ? `Could not add the date to ${failed.length === 1 ? one(failed) : countItems(failed)}`
+      : null,
+  ]
+
+  $.ui.toast(notes.filter(note => note !== null).join('. '))
 }
 
 const createFolder = async ($: EngineInterface, raw: string) => {
@@ -606,6 +716,7 @@ const toggleList = async ($: EngineInterface) => {
 
   await update($, isListOpen, () => isOpen)
   await update($, isConfirming, () => false)
+  await update($, isConfirmingDate, () => false)
 
   if (isOpen) {
     await update($, page, () => 0)
@@ -635,6 +746,7 @@ const filterBy = async ($: EngineInterface, value: string) => {
 // them are ticked, unticks them.
 const toggleAll = async ($: EngineInterface, shown: readonly string[]) => {
   await update($, isConfirming, () => false)
+  await update($, isConfirmingDate, () => false)
   await update($, selected, list =>
     shown.every(n => list.includes(n))
       ? list.filter(n => !shown.includes(n))
@@ -767,13 +879,24 @@ const showInFinder = async ($: EngineInterface, name: string) => {
   }
 }
 
+// The moment of the click, to the second (the clock shows only the minute).
+const copyClock = async ($: EngineInterface, surface: RenderSurface) => {
+  const text = namePrefix(await $.clock.now(), await read($, zoneOffset))
+  const { isCopied } = await $.ui.copy({ text, surface })
+
+  $.ui.toast(isCopied ? `Copied "${text}"` : 'Could not copy to the clipboard')
+}
+
 // A new Terminal window in the target, running Claude Code. The folder and the
 // program come in as arguments and are quoted by AppleScript, never put into
-// the script.
+// the script. 110 × 35: the bar's full labels (from 100 columns) and room for
+// the file list (from 35 rows).
 const CLAUDE_SCRIPT = [
   'on run argv',
   'tell application "Terminal"',
-  'do script "cd " & quoted form of (item 1 of argv) & " && " & quoted form of (item 2 of argv)',
+  'set t to do script "cd " & quoted form of (item 1 of argv) & " && " & quoted form of (item 2 of argv)',
+  'set number of columns of t to 110',
+  'set number of rows of t to 35',
   'activate',
   'end tell',
   'end run',
@@ -989,6 +1112,7 @@ const refreshList = async ($: EngineInterface) => {
 
 const toggleSelected = async ($: EngineInterface, name: string) => {
   await update($, isConfirming, () => false)
+  await update($, isConfirmingDate, () => false)
   await update($, selected, list =>
     list.includes(name) ? list.filter(n => n !== name) : [...list, name],
   )
@@ -1326,13 +1450,13 @@ export const register: Register = (on, options) => {
     const dir = await read($, subdir)
     const modVersion = await read($, version)
     const shownMinute = await read($, clockNow)
-    const clock =
-      shownMinute === 0
-        ? null
-        : formatClock(shownMinute, await read($, zoneOffset), await read($, zoneName))
+    const offset = await read($, zoneOffset)
+    const zone = await read($, zoneName)
+    const clock = shownMinute === 0 ? null : formatClock(shownMinute, offset, zone)
     const target = dir === '' ? root : `${root}/${dir}`
     const naming = await read($, isNamingFolder)
     const editing = await read($, renaming)
+    const editValue = await read($, renameValue)
     const editError = await read($, renameError)
     const nameError = await read($, folderError)
     const isBusy = await read($, busy)
@@ -1348,7 +1472,10 @@ export const register: Register = (on, options) => {
     const names = listOpen ? (hits ?? (await read($, entries))) : []
     const ticked = listOpen ? await read($, selected) : []
     const sizeOf = !listOpen ? {} : showFolder ? await read($, searchSizes) : await read($, sizes)
+    // Search results have no counts: counting every folder found could take long.
+    const countOf = !listOpen || showFolder ? {} : await read($, counts)
     const confirming = listOpen && ticked.length > 0 && (await read($, isConfirming))
+    const confirmingDate = listOpen && ticked.length > 0 && !confirming && (await read($, isConfirmingDate))
     const filterText = await read($, filter)
     const by = await read($, sortBy)
     const desc = await read($, isSortDesc)
@@ -1396,6 +1523,11 @@ export const register: Register = (on, options) => {
     // The "│" and "─┼─" lines only meet the columns in the terminal's monospace
     // font; the desktop draws text in another font, so it gets the frame alone.
     const lines = e.surface === 'terminal'
+    // A line between two columns: "│" in the terminal; on the desktop a box a
+    // fraction of a cell wide (about a pixel; sizes are cells, not pixels), as
+    // tall as the row, so it does not depend on the font.
+    const columnLine = () =>
+      lines ? <Text dimColor>│</Text> : <Box width={GRID_LINE} backgroundColor={DESKTOP_GRID} />
     // Each column has a cell of padding on both sides (on the desktop, not the
     // tick box), the frame 2 sides, and in the terminal 3 "│" between them.
     const tickWidth = lines ? TICK_WIDTH : DESKTOP_TICK_WIDTH
@@ -1682,7 +1814,9 @@ export const register: Register = (on, options) => {
             <Box width={labelWidth} flexShrink={0} />
             <Box flexDirection="column" flexGrow={1}>
               <Box flexDirection="row" gap={1}>
-                <Box flexGrow={1}>
+                {/* On the desktop the field keeps its own width, so Cancel
+                    follows it directly. */}
+                <Box flexGrow={lines ? 1 : 0}>
                   <Input
                     key="folder-name"
                     label="📁 New folder"
@@ -1745,7 +1879,7 @@ export const register: Register = (on, options) => {
                         onPress={() => toggleAll($, view)}
                       />
                     </Box>
-                    {lines && <Text dimColor>│</Text>}
+                    {columnLine()}
                     <Box width={nameWidth + 2} paddingX={1}>
                       <Button
                         key="sort-name"
@@ -1754,7 +1888,7 @@ export const register: Register = (on, options) => {
                         onPress={() => sortOn($, 'name')}
                       />
                     </Box>
-                    {showFolder && lines && <Text dimColor>│</Text>}
+                    {showFolder && columnLine()}
                     {showFolder && (
                       <Box width={folderWidth + 2} paddingX={1}>
                         <Button
@@ -1765,7 +1899,7 @@ export const register: Register = (on, options) => {
                         />
                       </Box>
                     )}
-                    {lines && <Text dimColor>│</Text>}
+                    {columnLine()}
                     <Box width={SIZE_WIDTH + 2} paddingX={1}>
                       <Button
                         key="sort-size"
@@ -1774,27 +1908,31 @@ export const register: Register = (on, options) => {
                         onPress={() => sortOn($, 'size')}
                       />
                     </Box>
-                    {lines && <Text dimColor>│</Text>}
+                    {columnLine()}
                     <Box width={ACTIONS_WIDTH + 2} paddingX={1}>
                       <Text bold>Actions</Text>
                     </Box>
                   </Box>
-                  {lines && (
+                  {lines ? (
                     <Text key="table-line" dimColor>
                       {[tickWidth, nameWidth, ...(showFolder ? [folderWidth] : []), SIZE_WIDTH, ACTIONS_WIDTH]
                         .map(width => '─'.repeat(width + 2))
                         .join('┼')}
                     </Text>
+                  ) : (
+                    <Box key="table-line" height={GRID_ROW_LINE} backgroundColor={DESKTOP_GRID} />
                   )}
                   {pageNames.map((name, index) =>
                     editing === name ? (
                       <Box key={`edit:${name}`} flexDirection="column" paddingX={1}>
                         <Box flexDirection="row" gap={1}>
-                          <Box flexGrow={1}>
+                          {/* On the desktop the field keeps its own width, so
+                              Cancel follows it directly. */}
+                          <Box flexGrow={lines ? 1 : 0}>
                             <Input
                               key={`rename-field:${name}`}
                               label="📝 Rename to"
-                              value={entryName(name).replace(/\/$/, '')}
+                              value={editValue ?? entryName(name).replace(/\/$/, '')}
                               submitLabel="📝 Rename"
                               autoFocus
                               onInput={() =>
@@ -1832,7 +1970,7 @@ export const register: Register = (on, options) => {
                             onPress={() => toggleSelected($, name)}
                           />
                         </Box>
-                        {lines && <Text dimColor>│</Text>}
+                        {columnLine()}
                         <Box width={nameWidth + 2} paddingX={1}>
                           {name.endsWith('/') ? (
                             <Button
@@ -1852,7 +1990,7 @@ export const register: Register = (on, options) => {
                             />
                           )}
                         </Box>
-                        {showFolder && lines && <Text dimColor>│</Text>}
+                        {showFolder && columnLine()}
                         {showFolder && (
                           // A keyed Box is a hover scope: the pointer over the cell
                           // reveals the full folder above it, over the row before,
@@ -1883,13 +2021,16 @@ export const register: Register = (on, options) => {
                             </Box>
                           </Box>
                         )}
-                        {lines && <Text dimColor>│</Text>}
+                        {columnLine()}
                         <Box width={SIZE_WIDTH + 2} paddingX={1}>
+                          {countOf[name] !== undefined && (
+                            <Text dimColor>{itemCount(countOf[name][showDots ? 'all' : 'shown'])}</Text>
+                          )}
                           {sizeOf[name] !== undefined && (
                             <Text dimColor>{humanSize(sizeOf[name])}</Text>
                           )}
                         </Box>
-                        {lines && <Text dimColor>│</Text>}
+                        {columnLine()}
                         {/* The desktop draws each Button with its own padding: no gap
                             needed there. The terminal needs one cell between labels. */}
                         <Box
@@ -1912,6 +2053,13 @@ export const register: Register = (on, options) => {
                             plain
                             dimColor
                             onPress={() => startRename($, name)}
+                          />
+                          <Button
+                            key={`date:${name}`}
+                            label="📅 Date"
+                            plain
+                            dimColor
+                            onPress={() => startDate($, name)}
                           />
                           <Button
                             key={`mention:${name}`}
@@ -1942,7 +2090,7 @@ export const register: Register = (on, options) => {
               )}
               {searching && <Text dimColor>Searching...</Text>}
               {note !== null && <Text color="yellow">{`⚠ ${note}`}</Text>}
-              {ticked.length > 0 && !confirming && (
+              {ticked.length > 0 && !confirming && !confirmingDate && (
                 <Box flexDirection="row" gap={1} alignItems="center">
                   <Text dimColor>{`${ticked.length} selected:`}</Text>
                   <Button
@@ -1950,8 +2098,30 @@ export const register: Register = (on, options) => {
                     label="❌ Delete"
                     onPress={() => update($, isConfirming, () => true)}
                   />
+                  <Button key="date-selected" label="📅 Date" onPress={() => update($, isConfirmingDate, () => true)} />
                   <Button key="mention-selected" label="💬 Ask" onPress={() => mention($, ticked)} />
                   <Button key="copy-selected" label="📋 Copy" onPress={() => copyToClipboard($, ticked)} />
+                </Box>
+              )}
+              {confirmingDate && (
+                <Box flexDirection="column">
+                  <Text color="yellow">{`Add the date and time before the name of ${countItems(ticked)}?`}</Text>
+                  <Box flexDirection="row" gap={1}>
+                    <Button
+                      key="confirm-date"
+                      label="📅 Add date"
+                      onPress={async () => {
+                        await update($, isConfirmingDate, () => false)
+                        await addDate($, ticked)
+                      }}
+                    />
+                    <Button
+                      key="cancel-date"
+                      label="⏹️ Cancel"
+                      plain
+                      onPress={() => update($, isConfirmingDate, () => false)}
+                    />
+                  </Box>
                 </Box>
               )}
               {confirming && (
@@ -2008,13 +2178,24 @@ export const register: Register = (on, options) => {
           />
           {/* Pushes the clock to the right end. */}
           <Box flexGrow={1} />
-          {/* One Text, so the row's gap does not widen the space before the dot. */}
+          {/* A Box with no gap, so the row's gap does not widen the space
+              before the dot. */}
           {(clock !== null || e.surface === 'desktop' || modVersion !== null) && (
             // Never wrapped or cut: the clock and the version keep their room;
             // the tip wraps instead.
-            <Box flexShrink={0}>
+            <Box flexShrink={0} flexDirection="row">
+              {/* A click puts the date and time on the clipboard as the start of
+                  a file name. */}
+              {clock !== null && (
+                <Button
+                  key="clock"
+                  label={clock}
+                  plain
+                  dimColor
+                  onPress={press => copyClock($, press.surface)}
+                />
+              )}
               <Text dimColor wrap="truncate">
-                {clock ?? ''}
                 {(e.surface === 'desktop' || modVersion !== null) && clock !== null && ' · '}
                 {/* The desktop links the version to the README; the terminal
                     shows it as plain text, as a link there did not show. */}
