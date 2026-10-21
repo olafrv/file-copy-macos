@@ -222,15 +222,16 @@ export const parseZone = (text: string): { offset: number; name: string } => {
   return { offset: match[1] === '-' ? -minutes : minutes, name: match[4] ?? 'UTC' }
 }
 
-/** A moment as "13.10.2026 14:32 CEST", in the zone given. */
-export const formatClock = (ms: number, offset: number, zone: string): string => {
+/**
+ * A moment as "13.10.2026 14:32 CEST", in the zone given; `isShort` gives the
+ * time alone, "14:32", for a narrow terminal.
+ */
+export const formatClock = (ms: number, offset: number, zone: string, isShort = false): string => {
   const d = new Date(ms + offset * 60_000)
   const two = (n: number) => String(n).padStart(2, '0')
+  const time = `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`
 
-  return (
-    `${two(d.getUTCDate())}.${two(d.getUTCMonth() + 1)}.${d.getUTCFullYear()} ` +
-    `${two(d.getUTCHours())}:${two(d.getUTCMinutes())} ${zone}`
-  )
+  return isShort ? time : `${two(d.getUTCDate())}.${two(d.getUTCMonth() + 1)}.${d.getUTCFullYear()} ${time} ${zone}`
 }
 
 const NAME_PREFIX = /^\d{4}-\d{2}-\d{2}_\d{6} - /

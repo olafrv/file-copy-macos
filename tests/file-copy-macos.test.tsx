@@ -1274,7 +1274,11 @@ test('the Finder row shows the clock and the version on both surfaces; a click c
   })
   on('session.root', () => ({ value: '/proj' }))
   on('clock.now', () => ({ value: Date.UTC(2026, 9, 13, 12, 32, 15) }))
-  on('process.run', ($, e) => ({ value: ran(e.argv[0] === '/bin/date' ? '+0200 CEST\n' : '') }))
+  const runs: (readonly string[])[] = []
+  on('process.run', ($, e) => {
+    runs.push(e.argv)
+    return { value: ran(e.argv[0] === '/bin/date' ? '+0200 CEST\n' : '') }
+  })
   on('fs.read', () => ({ value: JSON.stringify({ name: 'file-copy-macos', version: '9.8.7' }) }))
 
   on('session.start', () => ({ cwd: '/proj' }))
@@ -1287,10 +1291,14 @@ test('the Finder row shows the clock and the version on both surfaces; a click c
     expect((await ui.find({ key: 'clock' }))?.props.label).toBe('13.10.2026 14:32 CEST')
     const version = await ui.find({ type: 'Link' })
     expect(version?.children).toEqual(surface === 'desktop' ? ['v9.8.7'] : undefined)
-    const after = await ui.find({ type: 'Text', text: /^ · / })
+    const after = await ui.find({ type: 'Text', text: /^· / })
     const parts = (after?.children ?? []).filter(c => typeof c === 'string')
     // The terminal shows the version as plain text after the dot.
-    expect(parts).toEqual(surface === 'desktop' ? [' · '] : [' · ', 'v9.8.7'])
+    expect(parts).toEqual(surface === 'desktop' ? ['· '] : ['· v9.8.7'])
+
+    // 📅 before it opens the Calendar app.
+    await ui.press({ key: 'calendar' })
+    expect(runs.at(-1)).toEqual(['/usr/bin/open', '-a', 'Calendar'])
 
     await ui.press({ key: 'clock' })
     // Copied as the start of a file name: year first, so it sorts.
@@ -1298,6 +1306,19 @@ test('the Finder row shows the clock and the version on both surfaces; a click c
     expect(toasts.at(-1)).toBe('Copied "2026-10-13_143215 - "')
     await ui.unmount()
   }
+
+  // A narrow terminal (under 100 columns) shows the time alone; a click still
+  // copies the whole start of a file name.
+  const narrow = await $.ui.mount({
+    plugin: 'file-copy-macos',
+    surface: 'terminal',
+    ...BAND,
+    props: { ...BAND.props, bodyColumns: 75 },
+  })
+  expect((await narrow.find({ key: 'clock' }))?.props.label).toBe('14:32')
+  await narrow.press({ key: 'clock' })
+  expect(copies.at(-1)?.text).toBe('2026-10-13_143215 - ')
+  await narrow.unmount()
 })
 
 test('Ask puts @paths into the prompt; the header tick selects all shown', async ($, on) => {
@@ -1995,7 +2016,8 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   // Finder row: the icon label, the short tip, then the clock and version.
   const tip = 'Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋'
   expect(await ui.find({ type: 'Text', text: tip })).toBeDefined()
-  const finderRow = 2 + 1 + cells(tip) + 1 + cells('16.10.2026 01:18 CEST · v1.19.1')
+  // The clock shows the time alone there.
+  const finderRow = 2 + 1 + cells(tip) + 1 + cells('· 💤') + 1 + cells('📅') + 1 + cells('01:18 · v1.19.1')
   expect(finderRow).toBeLessThanOrEqual(75)
   await ui.unmount()
 

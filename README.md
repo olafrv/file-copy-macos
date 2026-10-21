@@ -79,7 +79,7 @@ The mod is for macOS only, because it uses these macOS commands:
 | `/bin/mv` | 📝 Ren and 📅 Date |
 | `/bin/mkdir` | 📁 New folder |
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
-| `/usr/bin/open` | ↗️ Open and 📌 Locate |
+| `/usr/bin/open` | ↗️ Open, 📌 Locate and 📅 (Calendar) |
 | `/usr/sbin/screencapture` | 📸 Shot |
 | `/usr/bin/osascript` | 📄 Files and 🗂️ Folders pickers, 📋 Copy and 📋 Paste (clipboard files and images), ✴️ Claude (Terminal) |
 | `/bin/date` | The time zone of the clock |
@@ -152,7 +152,7 @@ If a name already exists in the target, the mod asks first:
 
 ### Clock
 
-The Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`. It changes on each full minute. Click it to copy the date and time as the start of a file name, `2026-10-13_143215 - `, so you can paste it and type the name after it. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. The version of the mod follows the clock after a middle dot. On the desktop it is a link to this README.
+The Finder row shows the local date, time and time zone, for example `13.10.2026 14:32 CEST`; in a terminal narrower than 100 columns only the time, `14:32`. It changes on each full minute. **📅** before it opens the Calendar app. Click the clock to copy the date and time as the start of a file name, `2026-10-13_143215 - `, so you can paste it and type the name after it. The mod reads the time zone from macOS and checks it again each hour, so the change to and from summer time is shown. The version of the mod follows the clock after a middle dot. On the desktop it is a link to this README.
 
 ### What Claude is told
 

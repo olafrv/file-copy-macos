@@ -879,6 +879,15 @@ const showInFinder = async ($: EngineInterface, name: string) => {
   }
 }
 
+// 📅 before the clock: macOS's Calendar app.
+const openCalendar = async ($: EngineInterface) => {
+  const { exitCode } = await $.process.run(['/usr/bin/open', '-a', 'Calendar'])
+
+  if (exitCode !== 0) {
+    $.ui.toast('Could not open Calendar')
+  }
+}
+
 // The moment of the click, to the second (the clock shows only the minute).
 const copyClock = async ($: EngineInterface, surface: RenderSurface) => {
   const text = namePrefix(await $.clock.now(), await read($, zoneOffset))
@@ -1452,7 +1461,9 @@ export const register: Register = (on, options) => {
     const shownMinute = await read($, clockNow)
     const offset = await read($, zoneOffset)
     const zone = await read($, zoneName)
-    const clock = shownMinute === 0 ? null : formatClock(shownMinute, offset, zone)
+    // A narrow terminal (as for the labels) shows the time alone.
+    const isShortClock = e.surface === 'terminal' && e.props.bodyColumns < NARROW_COLUMNS
+    const clock = shownMinute === 0 ? null : formatClock(shownMinute, offset, zone, isShortClock)
     const target = dir === '' ? root : `${root}/${dir}`
     const naming = await read($, isNamingFolder)
     const editing = await read($, renaming)
@@ -2167,25 +2178,28 @@ export const register: Register = (on, options) => {
             )}
           </Box>
           {/* The help switch, right after the tip: sleeping 💤 while the tips are
-              off, green ✅ while they show. */}
-          <Text dimColor>·</Text>
-          <Button
-            key="tips"
-            label={narrow ? (tipsOn ? '✅' : '💤') : tipsOn ? '✅ Tips' : '💤 Tips'}
-            plain
-            dimColor={!tipsOn}
-            onPress={() => toggleTips($)}
-          />
+              off, green ✅ while they show. On the desktop a Button has its own
+              padding, so the parts around one sit in a Box with no gap: the
+              padding alone keeps them apart, as wide as the row's gap. */}
+          <Box flexDirection="row" gap={lines ? 1 : 0}>
+            <Text dimColor>·</Text>
+            <Button
+              key="tips"
+              label={narrow ? (tipsOn ? '✅' : '💤') : tipsOn ? '✅ Tips' : '💤 Tips'}
+              plain
+              dimColor={!tipsOn}
+              onPress={() => toggleTips($)}
+            />
+          </Box>
           {/* Pushes the clock to the right end. */}
           <Box flexGrow={1} />
-          {/* A Box with no gap, so the row's gap does not widen the space
-              before the dot. */}
           {(clock !== null || e.surface === 'desktop' || modVersion !== null) && (
             // Never wrapped or cut: the clock and the version keep their room;
             // the tip wraps instead.
-            <Box flexShrink={0} flexDirection="row">
-              {/* A click puts the date and time on the clipboard as the start of
-                  a file name. */}
+            <Box flexShrink={0} flexDirection="row" gap={lines ? 1 : 0}>
+              {/* 📅 opens Calendar; a click on the clock puts the date and time
+                  on the clipboard as the start of a file name. */}
+              {clock !== null && <Button key="calendar" label="📅" plain onPress={() => openCalendar($)} />}
               {clock !== null && (
                 <Button
                   key="clock"
@@ -2195,16 +2209,17 @@ export const register: Register = (on, options) => {
                   onPress={press => copyClock($, press.surface)}
                 />
               )}
-              <Text dimColor wrap="truncate">
-                {(e.surface === 'desktop' || modVersion !== null) && clock !== null && ' · '}
-                {/* The desktop links the version to the README; the terminal
-                    shows it as plain text, as a link there did not show. */}
-                {e.surface === 'desktop' ? (
+              {/* The desktop links the version to the README, after the clock
+                  button's padding and "· "; the terminal shows it as plain text
+                  (a link there did not show), the row's gap around the dot. */}
+              {e.surface === 'desktop' ? (
+                <Text dimColor wrap="truncate">
+                  {clock !== null && '· '}
                   <Link href={HELP_URL}>{modVersion === null ? 'Help' : `v${modVersion}`}</Link>
-                ) : (
-                  modVersion !== null && `v${modVersion}`
-                )}
-              </Text>
+                </Text>
+              ) : (
+                modVersion !== null && <Text dimColor>{clock === null ? `v${modVersion}` : `· v${modVersion}`}</Text>
+              )}
             </Box>
           )}
         </Box>
