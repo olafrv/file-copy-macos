@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.24.1
+
+- 📸 Shot and pasted images use the same date format as 📅 Date and the clock: `2026-10-21_222903 - Screenshot.png` and `2026-10-21_222903 - Pasted.png`. 📅 Date sees them as dated already.
+
 ## 1.24.0
 
 - New row action **📅 Date**, after 📝 Ren: it opens the rename field with the time of the click before the name (`2026-10-21_221537 - report.pdf`). Enter renames, ⏹️ Cancel keeps the name. For ticked items it asks first, then gives all of them the same time; names that already have such a date stay as they are.
