@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.24.4
+
+- README: Requirements says that the VS Code extension and the mobile app are not supported.
+
 ## 1.24.3
 
 - README: new screenshots with 📅 and the even spacing in the 💡 Finder row.
