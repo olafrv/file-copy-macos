@@ -69,7 +69,7 @@ A change applies after `/reload-plugins` or in a new session.
 
 - macOS 15 or later.
 - In a terminal: a window of at least 80 columns and 35 rows. In a shorter window the bar gets too few rows (Claude Code gives it at most half of the window, together with the prompt), so it scrolls and hides the file list. The desktop app needs nothing special.
-- Claude Code with mod (function hook) support.
+- Claude Code with mod (function hook) support, in a terminal or in the Claude desktop app. The VS Code extension and the mobile app are not supported: the bar does not appear there.
 
 The mod is for macOS only, because it uses these macOS commands:
 
