@@ -81,7 +81,7 @@ The mod is for macOS only, because it uses these macOS commands:
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
 | `/usr/bin/open` | ↗️ Open and 📌 Locate |
 | `/usr/sbin/screencapture` | 📸 Shot |
-| `/usr/bin/osascript` | 📄 Files and 🗂️ Folders pickers, 📋 Copy and 📋 Paste (clipboard), ✴️ Claude (Terminal) |
+| `/usr/bin/osascript` | 📄 Files and 🗂️ Folders pickers, 📋 Copy and 📋 Paste (clipboard files and images), ✴️ Claude (Terminal) |
 | `/bin/date` | The time zone of the clock |
 | `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
 
@@ -97,7 +97,7 @@ Point at 📋 Paste, 🧲 Desktop, 🧲 Downloads or the 💡 Finder tip to see 
 
 - **Paste paths** into the field and press Enter (or **🧲 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
 - **📄 Files** and **🗂️ Folders** open the macOS picker. You can select several items: hold Cmd and click each one.
-- **📋 Paste** adds the files and folders you copied in Finder with Cmd+C. Text on the clipboard is ignored.
+- **📋 Paste** adds the files and folders you copied in Finder with Cmd+C. With no files on the clipboard, it saves a copied image (for example a screenshot taken with Ctrl+Cmd+Shift+4, or "Copy Image" in a browser) into the target as a PNG, named by the local time, for example `2026-10-21 - 194512 - Pasted.png`. Text on the clipboard is ignored.
 - **🧲 Desktop** copies the newest file or folder on your Desktop, for example the screenshot you just took.
 - **🧲 Downloads** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.

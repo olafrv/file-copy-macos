@@ -1285,14 +1285,33 @@ test('Copy puts items on the clipboard, also the ticked ones; Finder selects one
   await ui.unmount()
 })
 
-test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add', async ($, on) => {
+test('Paste adds the files copied in Finder with Cmd+C, else saves a copied image; the field adds with Add', async ($, on) => {
   const copies: (readonly string[])[] = []
+  const toasts: string[] = []
+  const saved: string[] = []
   let clipboard = '/Users/me/Desktop/My File.pdf\n/Users/me/Desktop/photos\n'
+  let hasImage = false
 
+  on('ui.toast', ($, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
   on('session.root', () => ({ value: '/proj' }))
+  on('clock.now', () => ({ value: Date.UTC(2026, 9, 21, 19, 45, 12) }))
+  fakeFs(on, dir => (dir === '/proj' ? saved : undefined))
   on('process.run', ($, e) => {
     if (e.argv[0] === '/usr/bin/osascript' && String(e.argv[4]).includes('public.file-url')) {
       return { value: ran(clipboard) }
+    }
+
+    // The image script gets the new file's path as its argument.
+    if (e.argv[0] === '/usr/bin/osascript' && String(e.argv[4]).includes('public.png')) {
+      if (!hasImage) {
+        return { value: ran('') }
+      }
+
+      saved.push(String(e.argv[5]).slice('/proj/'.length))
+      return { value: ran('saved\n') }
     }
 
     if (e.argv[0] === '/bin/sh' && e.argv[5] === 'check') {
@@ -1317,10 +1336,22 @@ test('Paste adds the files copied in Finder with Cmd+C; the field adds with Add'
     await ui.press({ key: 'paste-files' })
     expect(copies).toEqual([['/Users/me/Desktop/My File.pdf', '/Users/me/Desktop/photos']])
 
-    // Text on the clipboard, or nothing: no copy.
+    // Text on the clipboard, or nothing: no copy, a toast says so.
     clipboard = ''
+    toasts.length = 0
     await ui.press({ key: 'paste-files' })
     expect(copies.length).toBe(1)
+    expect(toasts[0]).toContain('No files or image on the clipboard')
+
+    // An image and no files: saved into the target as a PNG, named by the
+    // time; a second one in the same second gets " 2".
+    hasImage = true
+    saved.length = 0
+    await ui.press({ key: 'paste-files' })
+    await ui.press({ key: 'paste-files' })
+    expect(saved).toEqual(['2026-10-21 - 194512 - Pasted.png', '2026-10-21 - 194512 - Pasted 2.png'])
+    expect(toasts.at(-1)).toBe('Saved 2026-10-21 - 194512 - Pasted 2.png')
+    hasImage = false
     await ui.unmount()
   }
 })
@@ -1547,7 +1578,7 @@ test('only the buttons whose label does not say enough carry a help tip', async 
   fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf'] : undefined))
 
   const kept = [
-    ' Copy files you copied in Finder with Cmd+C ',
+    ' Copy files you copied in Finder with Cmd+C, or a copied image ',
     ' Copy newest item of ~/Downloads ',
     ' Copy newest item of ~/Desktop, for example a screenshot ',
     ' ⌘ = Command, ⌥ = Option. Copy files in Finder and press 📋 Paste, or copy their paths with Option+Command+C, paste them into 📎 Source and press 🧲 Add ',

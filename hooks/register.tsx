@@ -679,12 +679,39 @@ const PASTE_SCRIPT = `function run() {
   return paths.join('\\n')
 }`
 
+// Saves the image on the clipboard as a PNG at the path given and prints
+// "saved"; nothing when there is no image. macOS keeps screenshots and copied
+// images as PNG or TIFF; a TIFF is converted (4 is NSBitmapImageFileTypePNG).
+const PASTE_IMAGE_SCRIPT = `function run(argv) {
+  ObjC.import('AppKit')
+  const board = $.NSPasteboard.generalPasteboard
+  let data = board.dataForType('public.png')
+  if (data.isNil()) {
+    const tiff = board.dataForType('public.tiff')
+    if (tiff.isNil()) return ''
+    data = $.NSBitmapImageRep.imageRepWithData(tiff).representationUsingTypeProperties(4, $.NSDictionary.dictionary)
+  }
+  return data.writeToFileAtomically(argv[0], true) ? 'saved' : ''
+}`
+
 const pasteFromClipboard = async ($: EngineInterface) => {
   const { stdout } = await $.process.run(['/usr/bin/osascript', '-l', 'JavaScript', '-e', PASTE_SCRIPT])
   const paths = stdout.split('\n').filter(path => path.startsWith('/'))
 
+  // No files: an image (a screenshot to the clipboard, a copied picture) is
+  // saved into the target as a PNG.
   if (paths.length === 0) {
-    $.ui.toast('No files on the clipboard. Select files in Finder and press Cmd+C first.')
+    const dir = await targetDir($)
+    const name = await freeImageName($, dir, 'Pasted')
+    const path = `${dir}/${name}`
+    const image = await $.process.run(['/usr/bin/osascript', '-l', 'JavaScript', '-e', PASTE_IMAGE_SCRIPT, path])
+
+    if (image.stdout.trim() === 'saved' && (await $.fs.exists(path))) {
+      await showSaved($, dir, name)
+      return
+    }
+
+    $.ui.toast('No files or image on the clipboard. Copy files in Finder with Cmd+C, or copy an image.')
     return
   }
 
@@ -1111,15 +1138,7 @@ const pickAndCopy = async ($: EngineInterface, kind: PickKind) => {
 // app that runs Claude Code.
 const takeShot = async ($: EngineInterface, isTerminal: boolean) => {
   const dir = await targetDir($)
-  const now = await $.clock.now()
-  const offset = await read($, zoneOffset)
-  let n = 1
-
-  while (await $.fs.exists(`${dir}/${shotName(now, offset, n)}`)) {
-    n += 1
-  }
-
-  const name = shotName(now, offset, n)
+  const name = await freeImageName($, dir, 'Screenshot')
   const path = `${dir}/${name}`
 
   const shot = await $.process.run(['/usr/sbin/screencapture', '-i', '-x', path], {
@@ -1142,6 +1161,24 @@ const takeShot = async ($: EngineInterface, isTerminal: boolean) => {
     return
   }
 
+  await showSaved($, dir, name)
+}
+
+// A new image's name in the target, by the local time: the first one free.
+const freeImageName = async ($: EngineInterface, dir: string, word: string) => {
+  const now = await $.clock.now()
+  const offset = await read($, zoneOffset)
+  let n = 1
+
+  while (await $.fs.exists(`${dir}/${shotName(now, offset, n, word)}`)) {
+    n += 1
+  }
+
+  return shotName(now, offset, n, word)
+}
+
+// A file the bar made in the target: shown in Copied, and Claude gets a note.
+const showSaved = async ($: EngineInterface, dir: string, name: string) => {
   await update($, last, () => ({ root: dir, copied: [name], skipped: [], failed: [] }))
   await update($, isHidden, () => false)
 
@@ -1472,7 +1509,7 @@ export const register: Register = (on, options) => {
               onPress={() => pasteFromClipboard($)}
             />
             <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` Copy files you copied in Finder with Cmd+C `}</Text>
+              <Text inverse>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
             </Box>
           </Box>
           <Box key="tip:latest-desktop">

@@ -309,13 +309,13 @@ export const isHiddenEntry = (entry: string): boolean =>
 /**
  * A screenshot's file name at a moment, in the zone given (minutes from
  * UTC): "2026-10-16 - 173756 - Screenshot.png"; `n` above 1 adds " n" for a
- * second shot in the same second.
+ * second shot in the same second. `word` names the kind ("Pasted").
  */
-export const shotName = (ms: number, offset: number, n = 1): string => {
+export const shotName = (ms: number, offset: number, n = 1, word = 'Screenshot'): string => {
   const d = new Date(ms + offset * 60_000)
   const two = (v: number) => String(v).padStart(2, '0')
   const day = `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())}`
   const time = `${two(d.getUTCHours())}${two(d.getUTCMinutes())}${two(d.getUTCSeconds())}`
 
-  return `${day} - ${time} - Screenshot${n > 1 ? ` ${n}` : ''}.png`
+  return `${day} - ${time} - ${word}${n > 1 ? ` ${n}` : ''}.png`
 }
