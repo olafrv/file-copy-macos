@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.24.3
+
+- README: new screenshots with 📅 and the even spacing in the 💡 Finder row.
+
 ## 1.24.2
 
 - New **📅** button before the clock: opens the Calendar app.
