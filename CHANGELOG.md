@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.22.3
+
+- The "📚 Content:" label is gone. The row below 🎯 Target is now **🏷️ Filter:**, with the filter field first, then ♻️ Refresh, 🫣 Hide and 👻 .files.
+- 🎯 Target row: ↗️ Open, 📁 New folder, 📸 Shot, ✴️ Claude, 📌 Locate (the most used first).
+- Row actions in the table: ↗️ Open, 📝 Ren, 💬 Ask, 📋 Copy, 📌 Locate.
+- Terminal: the label column is 1 cell narrower.
+- README: the descriptions follow the new order.
+
 ## 1.22.2
 
 - The bar shows only in the terminal and in the desktop app. It no longer appears in the VS Code extension, whose panel is too narrow for it, or on any other surface.
