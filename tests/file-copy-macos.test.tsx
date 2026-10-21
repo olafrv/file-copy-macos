@@ -592,14 +592,17 @@ test('the pasted list shows folders with a folder icon and counts items', async 
   }
 })
 
-test('the Content label and folder rows use emoji on every surface', async ($, on) => {
+test('the Target label and folder rows use emoji on every surface', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
   fakeFs(on, dir => (dir === '/proj' ? ['docs/'] : undefined))
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: '📚 Content:' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '🎯 Target:' })).toBeDefined()
+    // The content row's label is the filter's.
+    expect(await ui.find({ type: 'Text', text: '🏷️ Filter:' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '📚 Content:' })).toBeUndefined()
     await ui.press({ key: 'list' })
     expect((await ui.find({ key: 'dir:docs/' }))?.props.label).toBe('📁 docs/')
     expect(await ui.find({ type: 'Svg' })).toBeUndefined()
@@ -1802,8 +1805,8 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   expect(await labelOf(ui, 'list')).toBe('🫣')
   expect(await labelOf(ui, 'dotfiles')).toBe('👻 .files')
   // The rows' labels show their icons alone.
-  expect(await ui.find({ type: 'Text', text: '📚' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: '📚 Content:' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: '🎯' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '🎯 Target:' })).toBeUndefined()
 
   // Source row: the icon label, then the field (at least 20 cells for
   // "Paths ↵" and its Add), then the buttons in brackets.
@@ -1812,7 +1815,7 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   expect(sourceRow).toBeLessThanOrEqual(75)
 
   // Content row: the icon label, Refresh, Hide, New folder, .files, the
-  // filter label and box (8 + 16), Clear and the page control "◀ 1/2 (#7) ▶".
+  // filter box (24), Clear and the page control "◀ 1/2 (#7) ▶".
   const plain = await Promise.all(
     ['refresh', 'list', 'new-folder', 'dotfiles'].map(async key => cells(await labelOf(ui, key))),
   )
@@ -1832,7 +1835,7 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   const wide = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND, props: { ...BAND.props, bodyColumns: 115 } })
   expect(await labelOf(wide, 'latest-download')).toBe('🧲 Downloads')
   expect(await labelOf(wide, 'list')).toBe('🫣 Hide')
-  expect(await wide.find({ type: 'Text', text: '📚 Content:' })).toBeDefined()
+  expect(await wide.find({ type: 'Text', text: '🎯 Target:' })).toBeDefined()
   await wide.unmount()
 })
 

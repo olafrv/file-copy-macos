@@ -222,10 +222,10 @@ const clearFilter = async ($: EngineInterface) => {
 // Below this many columns (the band's), a terminal draws short labels.
 const NARROW_COLUMNS = 100
 
-// The label column: wide enough for "📚 Content:" (an icon is 2 columns),
+// The label column: wide enough for "📎 Source:" (an icon is 2 columns),
 // one cell less in the desktop's narrower font, and the icon alone in a
 // narrow terminal.
-const LABEL_WIDTH = 11
+const LABEL_WIDTH = 10
 const DESKTOP_LABEL_WIDTH = 9
 const ICON_LABEL_WIDTH = 2
 
@@ -1543,11 +1543,9 @@ export const register: Register = (on, options) => {
               </Box>
             ))}
           </Box>
-          {/* Real buttons, as Files and Folder in the row above. */}
+          {/* Real buttons, as Files and Folder in the row above. The most used
+              first: Open, then the two that make something new. */}
           <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
-          <Button key="finder-target" label="📌 Locate" onPress={() => showInFinder($, '')} />
-          <Button key="claude-target" label={narrow ? '✴️' : '✴️ Claude'} onPress={() => openClaude($)} />
-          {/* Both make something new in the target. */}
           {!naming && (
             <Button
               key="new-folder"
@@ -1556,11 +1554,30 @@ export const register: Register = (on, options) => {
             />
           )}
           <Button key="shot" label={narrow ? '📸' : '📸 Shot'} onPress={() => takeShot($, lines)} />
+          {/* Used less often: last. */}
+          <Button key="claude-target" label={narrow ? '✴️' : '✴️ Claude'} onPress={() => openClaude($)} />
+          <Button key="finder-target" label="📌 Locate" onPress={() => showInFinder($, '')} />
         </Box>
+        {/* The target's content, filtered: the row's label is the filter's. */}
         <Box flexDirection="row" gap={1} marginTop={rowSpace}>
           <Box width={labelWidth} flexShrink={0}>
-            <Text>{label('📚', 'Content')}</Text>
+            <Text>{label('🏷️', 'Filter')}</Text>
           </Box>
+          {/* The terminal draws the field as wide as its box; the desktop at its
+              own width, so a fixed box there would push Clear away. */}
+          <Box width={lines ? (narrow ? 24 : 38) : undefined}>
+            <Input
+              key={`filter-${await read($, filterId)}`}
+              placeholder="Name (↵ recursive)"
+              submitLabel="🔍 Find"
+              onInput={(value: string) => filterBy($, value)}
+              onSubmit={(value: string) => runSearch($, value)}
+            />
+          </Box>
+          {filterText !== '' && (
+            <Button key="clear-filter" label="🧹 Clear" plain dimColor onPress={() => clearFilter($)} />
+          )}
+          {/* The view: after the filter, used less often. */}
           <Button
             key="refresh"
             label={narrow ? '♻️' : '♻️ Refresh'}
@@ -1580,24 +1597,6 @@ export const register: Register = (on, options) => {
             dimColor={!showDots}
             onPress={() => toggleDotfiles($)}
           />
-          {/* The terminal draws a field's label with no space before the text
-              ("Filter:Name"), so there the label is a Text of its own. */}
-          {lines && <Text>Filter:</Text>}
-          {/* The terminal draws the field as wide as its box; the desktop at its
-              own width, so a fixed box there would push Clear away. */}
-          <Box width={lines ? (narrow ? 16 : 30) : undefined}>
-            <Input
-              key={`filter-${await read($, filterId)}`}
-              label={lines ? undefined : 'Filter'}
-              placeholder="Name (↵ recursive)"
-              submitLabel="🔍 Find"
-              onInput={(value: string) => filterBy($, value)}
-              onSubmit={(value: string) => runSearch($, value)}
-            />
-          </Box>
-          {filterText !== '' && (
-            <Button key="clear-filter" label="🧹 Clear" plain dimColor onPress={() => clearFilter($)} />
-          )}
           {listOpen && pageCount > 1 && (
             <Box flexDirection="row" gap={1}>
               {shownPage > 0 && (
@@ -1841,26 +1840,13 @@ export const register: Register = (on, options) => {
                           flexDirection="row"
                           gap={lines ? 1 : 0}
                         >
+                          {/* As on the Target row: Open first, Locate last. */}
                           <Button
                             key={`open:${name}`}
                             label="↗️ Open"
                             plain
                             dimColor
                             onPress={() => openWithDefaultApp($, name)}
-                          />
-                          <Button
-                            key={`show:${name}`}
-                            label="📌 Locate"
-                            plain
-                            dimColor
-                            onPress={() => showInFinder($, name)}
-                          />
-                          <Button
-                            key={`mention:${name}`}
-                            label="💬 Ask"
-                            plain
-                            dimColor
-                            onPress={() => mention($, [name])}
                           />
                           <Button
                             key={`rename:${name}`}
@@ -1870,11 +1856,25 @@ export const register: Register = (on, options) => {
                             onPress={() => startRename($, name)}
                           />
                           <Button
+                            key={`mention:${name}`}
+                            label="💬 Ask"
+                            plain
+                            dimColor
+                            onPress={() => mention($, [name])}
+                          />
+                          <Button
                             key={`copy:${name}`}
                             label="📋 Copy"
                             plain
                             dimColor
                             onPress={() => copyToClipboard($, [name])}
+                          />
+                          <Button
+                            key={`show:${name}`}
+                            label="📌 Locate"
+                            plain
+                            dimColor
+                            onPress={() => showInFinder($, name)}
                           />
                         </Box>
                       </Box>
