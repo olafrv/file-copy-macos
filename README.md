@@ -91,7 +91,7 @@ Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Downloads and the s
 
 The rows of the bar are 📎 Source, 🎯 Target, 🏷️ Filter (the target's content) and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and most buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, ✴️ Claude, 📸 Shot, 🧲🖥️ Desktop, 🧲⬇️ Downloads, ♻️ Refresh, 🫣 Hide, 📁 New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
 
-Point at 📋 Paste, 🧲 Desktop, 🧲 Downloads or the 💡 Finder tip to see what it does. The other buttons say it in their label. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
+**💤 Tips** in the 💡 Finder row turns on help tips (it becomes **✅ Tips**). Then point at 📋 Paste, 🧲 Desktop, 🧲 Downloads or the 💡 Finder tip to see what it does. The other buttons say it in their label. Tips are off by default, because the app shows them at once, without a delay. The mod remembers your choice. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
 ### Copy files and folders
 

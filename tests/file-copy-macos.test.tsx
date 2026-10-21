@@ -1572,7 +1572,12 @@ test('Clear goes back to page 1', async ($, on) => {
   await ui.unmount()
 })
 
-test('only the buttons whose label does not say enough carry a help tip', async ($, on) => {
+test('the Tips switch shows the help tips, only where a label does not say enough', async ($, on) => {
+  const store: { [key: string]: unknown } = {}
+  on('store.set', ($, e) => {
+    store[e.key] = e.value
+    return { value: undefined }
+  })
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
   fakeFs(on, dir => (dir === '/proj' ? ['docs/', 'a.pdf'] : undefined))
@@ -1598,7 +1603,17 @@ test('only the buttons whose label does not say enough carry a help tip', async 
     await ui.press({ key: 'list' })
     await ui.press({ key: 'tick:a.pdf' })
 
-    // Always there, revealed while the pointer is over its button; no switch.
+    // Off by default: 💤 Tips, and no tip at all.
+    expect((await ui.find({ key: 'tips' }))?.props.label).toBe('💤 Tips')
+    for (const text of kept) {
+      expect(await ui.find({ type: 'Text', text })).toBeUndefined()
+    }
+
+    // ✅ Tips: each is revealed while the pointer is over its button; the
+    // choice is saved.
+    await ui.press({ key: 'tips' })
+    expect((await ui.find({ key: 'tips' }))?.props.label).toBe('✅ Tips')
+    expect(store.tipsOn).toBe(true)
     for (const text of kept) {
       expect((await ui.find({ type: 'Text', text }))?.props.inverse).toBe(true)
     }
@@ -1607,7 +1622,8 @@ test('only the buttons whose label does not say enough carry a help tip', async 
       expect(await ui.find({ type: 'Text', text })).toBeUndefined()
     }
 
-    expect(await ui.find({ key: 'tips' })).toBeUndefined()
+    await ui.press({ key: 'tips' })
+    expect(store.tipsOn).toBe(false)
     await ui.press({ key: 'tick:a.pdf' })
     await ui.press({ key: 'list' })
     await ui.unmount()

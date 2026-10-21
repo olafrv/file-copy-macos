@@ -86,6 +86,18 @@ const isHidden = atom({ plugin: 'file-copy-macos', key: 'isHidden' } as const, f
 // Cmd+Shift+. does; saved in the store. Off by default, as in Finder.
 const dotsAtom = atom({ plugin: 'file-copy-macos', key: 'showDotfiles' } as const, false)
 const DOTS_KEY = 'showDotfiles'
+// Whether the help tips show (📋 Paste, 🧲 Desktop, 🧲 Downloads, the 💡
+// tip); saved in the store. Off by default: the app shows a tip at once, with
+// no delay, so they are for learning, not for every day.
+const tipsAtom = atom({ plugin: 'file-copy-macos', key: 'tipsOn' } as const, false)
+const TIPS_KEY = 'tipsOn'
+
+const toggleTips = async ($: EngineInterface) => {
+  const isOn = !(await read($, tipsAtom))
+
+  await update($, tipsAtom, () => isOn)
+  await $.store.set(TIPS_KEY, isOn)
+}
 
 const toggleDotfiles = async ($: EngineInterface) => {
   const isShown = !(await read($, dotsAtom))
@@ -1281,6 +1293,8 @@ export const register: Register = (on, options) => {
     await loadVersion($)
     const savedDots = await $.store.get(DOTS_KEY).catch(() => undefined)
     await update($, dotsAtom, () => savedDots === true)
+    const savedTips = await $.store.get(TIPS_KEY).catch(() => undefined)
+    await update($, tipsAtom, () => savedTips === true)
     await startClock($)
     await update($, last, () => null)
     await update($, subdir, () => '')
@@ -1340,6 +1354,7 @@ export const register: Register = (on, options) => {
     const desc = await read($, isSortDesc)
     // The search already matched the names; the live filter is for the target alone.
     const showDots = await read($, dotsAtom)
+    const tipsOn = await read($, tipsAtom)
     const view = viewEntries(
       showDots ? names : names.filter(name => !isHiddenEntry(name)),
       sizeOf,
@@ -1508,15 +1523,19 @@ export const register: Register = (on, options) => {
               label={narrow ? '📋' : '📋 Paste'}
               onPress={() => pasteFromClipboard($)}
             />
-            <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
-            </Box>
+            {tipsOn && (
+              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
+              </Box>
+            )}
           </Box>
           <Box key="tip:latest-desktop">
             <Button key="latest-desktop" label={narrow ? '🧲🖥️' : '🧲 Desktop'} onPress={() => copyNewestFrom($, 'Desktop')} />
-            <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` Copy newest item of ~/Desktop, for example a screenshot `}</Text>
-            </Box>
+            {tipsOn && (
+              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Copy newest item of ~/Desktop, for example a screenshot `}</Text>
+              </Box>
+            )}
           </Box>
           <Box key="tip:latest-download">
             <Button
@@ -1524,9 +1543,11 @@ export const register: Register = (on, options) => {
               label={narrow ? '🧲⬇️' : '🧲 Downloads'}
               onPress={() => copyNewestFrom($, 'Downloads')}
             />
-            <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` Copy newest item of ~/Downloads `}</Text>
-            </Box>
+            {tipsOn && (
+              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Copy newest item of ~/Downloads `}</Text>
+              </Box>
+            )}
           </Box>
         </Box>
         {message !== null && (
@@ -1960,7 +1981,7 @@ export const register: Register = (on, options) => {
           <Box width={labelWidth} flexShrink={0}>
             <Text>{label('💡', 'Finder')}</Text>
           </Box>
-          {/* A keyed Box: pointing at the short tip explains it in words. */}
+          {/* A keyed Box: with tips on, pointing at the short tip explains it. */}
           <Box key="tip:finder-tip" flexShrink={1}>
             <Text dimColor wrap="wrap">
               {e.surface === 'terminal'
@@ -1969,10 +1990,22 @@ export const register: Register = (on, options) => {
                   : FINDER_TIP_TERMINAL
                 : FINDER_TIP}
             </Text>
-            <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` ${FINDER_TIP_LONG} `}</Text>
-            </Box>
+            {tipsOn && (
+              <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` ${FINDER_TIP_LONG} `}</Text>
+              </Box>
+            )}
           </Box>
+          {/* The help switch, right after the tip: sleeping 💤 while the tips are
+              off, green ✅ while they show. */}
+          <Text dimColor>·</Text>
+          <Button
+            key="tips"
+            label={narrow ? (tipsOn ? '✅' : '💤') : tipsOn ? '✅ Tips' : '💤 Tips'}
+            plain
+            dimColor={!tipsOn}
+            onPress={() => toggleTips($)}
+          />
           {/* Pushes the clock to the right end. */}
           <Box flexGrow={1} />
           {/* One Text, so the row's gap does not widen the space before the dot. */}
