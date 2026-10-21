@@ -539,6 +539,8 @@ test('📅 Date fills the rename field with the click time; ticked items are ask
   }
 
   expect(hasNamePrefix('2026-10-13_123215 - a.pdf')).toBe(true)
+  // 📸 Shot and pasted images use the same start, so 📅 Date sees them as dated.
+  expect(hasNamePrefix(shotName(Date.UTC(2026, 9, 13, 12, 32, 15), 0, 1, 'Pasted'))).toBe(true)
   expect(hasNamePrefix('2026-10-13 - 123215 - Screenshot.png')).toBe(false)
   expect(namePrefix(Date.UTC(2026, 9, 13, 12, 32, 15), 120)).toBe('2026-10-13_143215 - ')
   expect(withNamePrefix('2026-01-02_030405 - old.txt', '2026-10-13_143215 - ')).toBe('2026-10-13_143215 - old.txt')
@@ -1468,8 +1470,8 @@ test('Paste adds the files copied in Finder with Cmd+C, else saves a copied imag
     saved.length = 0
     await ui.press({ key: 'paste-files' })
     await ui.press({ key: 'paste-files' })
-    expect(saved).toEqual(['2026-10-21 - 194512 - Pasted.png', '2026-10-21 - 194512 - Pasted 2.png'])
-    expect(toasts.at(-1)).toBe('Saved 2026-10-21 - 194512 - Pasted 2.png')
+    expect(saved).toEqual(['2026-10-21_194512 - Pasted.png', '2026-10-21_194512 - Pasted 2.png'])
+    expect(toasts.at(-1)).toBe('Saved 2026-10-21_194512 - Pasted 2.png')
     hasImage = false
     await ui.unmount()
   }
@@ -2050,8 +2052,8 @@ test('♻️ Refresh reads the list again, runs a search again, and opens a clos
 test('📸 Shot saves a screenshot straight into the target, named by the local time', async ($, on) => {
   // 15:37:56 UTC is 17:37:56 in CEST.
   const at = Date.UTC(2026, 9, 16, 15, 37, 56)
-  expect(shotName(at, 120)).toBe('2026-10-16 - 173756 - Screenshot.png')
-  expect(shotName(at, 120, 2)).toBe('2026-10-16 - 173756 - Screenshot 2.png')
+  expect(shotName(at, 120)).toBe('2026-10-16_173756 - Screenshot.png')
+  expect(shotName(at, 120, 2)).toBe('2026-10-16_173756 - Screenshot 2.png')
 
   const session = mock.session(on)
   let folder: string[] = []
@@ -2092,13 +2094,13 @@ test('📸 Shot saves a screenshot straight into the target, named by the local 
 
   // A capture: macOS's own selection, no sound, straight into the target.
   await ui.press({ key: 'shot' })
-  expect(captures[0]).toEqual(['/usr/sbin/screencapture', '-i', '-x', '/proj/2026-10-16 - 173756 - Screenshot.png'])
-  expect(await ui.find({ key: 'file:2026-10-16 - 173756 - Screenshot.png' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: '2026-10-16 - 173756 - Screenshot.png' })).toBeDefined()
+  expect(captures[0]).toEqual(['/usr/sbin/screencapture', '-i', '-x', '/proj/2026-10-16_173756 - Screenshot.png'])
+  expect(await ui.find({ key: 'file:2026-10-16_173756 - Screenshot.png' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '2026-10-16_173756 - Screenshot.png' })).toBeDefined()
 
   // A second shot in the same second gets " 2".
   await ui.press({ key: 'shot' })
-  expect(captures[1]?.[3]).toBe('/proj/2026-10-16 - 173756 - Screenshot 2.png')
+  expect(captures[1]?.[3]).toBe('/proj/2026-10-16_173756 - Screenshot 2.png')
 
   // Esc: nothing saved, nothing told.
   isCancelled = true
@@ -2121,5 +2123,5 @@ test('📸 Shot saves a screenshot straight into the target, named by the local 
 
   const fyi = session.appended().filter(r => r.message.type === 'user')
   expect(fyi.length).toBe(2)
-  expect(JSON.stringify(fyi[0])).toContain('2026-10-16 - 173756 - Screenshot.png')
+  expect(JSON.stringify(fyi[0])).toContain('2026-10-16_173756 - Screenshot.png')
 })
