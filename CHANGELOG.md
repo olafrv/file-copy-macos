@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.2
+
+- New **📅** button before the clock: opens the Calendar app.
+- In a terminal narrower than 100 columns, the clock shows only the time (`22:30`). A click still copies the full `2026-10-21_223015 - `.
+- Even spacing around 💤 Tips, 📅, the clock and the version on the desktop.
+
 ## 1.24.1
 
 - 📸 Shot and pasted images use the same date format as 📅 Date and the clock: `2026-10-21_222903 - Screenshot.png` and `2026-10-21_222903 - Pasted.png`. 📅 Date sees them as dated already.
