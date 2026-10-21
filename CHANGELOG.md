@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.23.0
+
+- **📋 Paste** also pastes an image. With no files on the clipboard, it saves a copied image (for example a screenshot taken with Ctrl+Cmd+Shift+4, or "Copy Image" in a browser) into the target as a PNG, named by the local time: `YYYY-MM-DD - HHMMSS - Pasted.png`. Claude gets a note, as after every copy.
+- With nothing usable on the clipboard, a toast says so.
+
 ## 1.22.3
 
 - The "📚 Content:" label is gone. The row below 🎯 Target is now **🏷️ Filter:**, with the filter field first, then ♻️ Refresh, 🫣 Hide and 👻 .files.
