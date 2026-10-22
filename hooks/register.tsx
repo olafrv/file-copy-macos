@@ -1982,7 +1982,9 @@ export const register: Register = (on, options) => {
                           />
                         </Box>
                         {columnLine()}
-                        <Box width={nameWidth + 2} paddingX={1}>
+                        {/* A keyed Box is a hover scope: a name cut with "…" shows
+                            whole above the row while the pointer is over it. */}
+                        <Box key={`name-cell:${name}`} width={nameWidth + 2} paddingX={1}>
                           {name.endsWith('/') ? (
                             <Button
                               key={`dir:${name}`}
@@ -1999,6 +2001,11 @@ export const register: Register = (on, options) => {
                               plain
                               onPress={() => openWithDefaultApp($, name)}
                             />
+                          )}
+                          {fitName(`📄 ${entryName(name)}`, nameWidth).endsWith('…') && (
+                            <Box position="absolute" top={-1} left={1} display="none" hover={{ display: 'flex' }}>
+                              <Text inverse>{` ${entryName(name)} `}</Text>
+                            </Box>
                           )}
                         </Box>
                         {showFolder && columnLine()}

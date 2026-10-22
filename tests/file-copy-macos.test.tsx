@@ -1070,6 +1070,9 @@ test('Content is a table: header, tick, name, size and actions per row', async (
     // A name too long for its column ends in "…" and fits it.
     const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
     expect(label.endsWith('…')).toBe(true)
+    // Pointing at it shows the whole name; a name that fits gets no tip.
+    expect((await ui.find({ type: 'Text', text: ` ${long} ` }))?.props.inverse).toBe(true)
+    expect(await ui.find({ type: 'Text', text: ' a.pdf ' })).toBeUndefined()
     // The table takes the whole width (100). In the terminal tick (2), size
     // (9), actions (47), padding and frame (10) and 3 column lines leave 29
     // for the name; on the desktop tick (5, no padding), size, actions,
