@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.24.5
+
+- A name cut with "…" in the table shows whole while the pointer is over it.
+
 ## 1.24.4
 
 - README: Requirements says that the VS Code extension and the mobile app are not supported.
