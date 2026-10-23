@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.24.6
+
+- **📋 Paste** moved to the 🏷️ Filter row, after 🔍 Find, so the 📎 Source row is shorter.
+- 🎯 Target row: ↗️ Open, 📌 Locate, 📁 New folder, 📸 Shot, ✴️ Claude.
+- The pickers are now **📄 File** and **🗂️ Folder** (they still accept several items).
+- ✴️ Claude: when Terminal was not running, Claude Code starts in Terminal's first window instead of a second one.
+- README: new screenshots.
+
 ## 1.24.5
 
 - A name cut with "…" in the table shows whole while the pointer is over it.
