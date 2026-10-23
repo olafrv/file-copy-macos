@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.25.0
+
+- New button **💾 Chat** on the 🎯 Target row: one click saves the conversation as Markdown in the target, named like a screenshot (`2026-10-24_101530 - Session.md`). Each message is under "👤 You" or "🤖 Claude"; each tool call is one short line, without its output.
+- The delete and 📅 Date questions show their buttons on the same line.
+- The table header "Actions" is no longer bold.
+
 ## 1.24.6
 
 - **📋 Paste** moved to the 🏷️ Filter row, after 🔍 Find, so the 📎 Source row is shorter.
