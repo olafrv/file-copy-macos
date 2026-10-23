@@ -26,6 +26,7 @@ import {
   parseZone,
   toFieldText,
   viewEntries,
+  sessionMarkdown,
 } from './paths'
 
 // The mod's version, read from its own plugin.json at session start.
@@ -1323,17 +1324,35 @@ const takeShot = async ($: EngineInterface, isTerminal: boolean) => {
   await showSaved($, dir, name)
 }
 
-// A new image's name in the target, by the local time: the first one free.
-const freeImageName = async ($: EngineInterface, dir: string, word: string) => {
+// A new file's name in the target, by the local time: the first one free.
+const freeImageName = async ($: EngineInterface, dir: string, word: string, ext = 'png') => {
   const now = await $.clock.now()
   const offset = await read($, zoneOffset)
   let n = 1
 
-  while (await $.fs.exists(`${dir}/${shotName(now, offset, n, word)}`)) {
+  while (await $.fs.exists(`${dir}/${shotName(now, offset, n, word, ext)}`)) {
     n += 1
   }
 
-  return shotName(now, offset, n, word)
+  return shotName(now, offset, n, word, ext)
+}
+
+// 💾 Chat: the conversation so far (the newest 4096 messages, text only) as a
+// Markdown file in the target, named like a screenshot.
+const saveSession = async ($: EngineInterface) => {
+  const dir = await targetDir($)
+  const name = await freeImageName($, dir, 'Session', 'md')
+  const title = `Claude Code session, ${formatClock(await $.clock.now(), await read($, zoneOffset), await read($, zoneName))}`
+  const messages = await $.session.messages()
+
+  try {
+    await $.fs.write(`${dir}/${name}`, sessionMarkdown(title, messages))
+  } catch {
+    $.ui.toast('Could not save the session')
+    return
+  }
+
+  await showSaved($, dir, name)
 }
 
 // A file the bar made in the target: shown in Copied, and Claude gets a note.
@@ -1563,7 +1582,7 @@ export const register: Register = (on, options) => {
     const narrow = lines && e.props.bodyColumns < NARROW_COLUMNS
     const labelWidth = narrow ? ICON_LABEL_WIDTH : lines ? LABEL_WIDTH : DESKTOP_LABEL_WIDTH
     const label = (icon: string, word: string) => (narrow ? icon : `${icon} ${word}:`)
-    // The Target path: what is left of the row after the label and the five
+    // The Target path: what is left of the row after the label and the six
     // buttons (with their padding on the desktop).
     const pathParts = [baseName(root), ...(dir === '' ? [] : dir.split('/'))]
     // The part above the project never changes while one works in it: "…/"
@@ -1571,11 +1590,11 @@ export const register: Register = (on, options) => {
     const path = fitCrumbs(
       '…/',
       pathParts,
-      // The buttons "[ ↗️ Open ]", "[ 📌 Locate ]", "[ ✴️ Claude ]", "[ 📁 New
-      // folder ]" and "[ 📸 Shot ]" with their gaps in the terminal (narrow:
-      // "[ ✴️ ]", "[ 📁 New ]" and "[ 📸 ]"); about the same with the desktop's
-      // padding.
-      e.props.bodyColumns - labelWidth - 1 - 27 - (narrow ? 25 : 44),
+      // The buttons "[ ↗️ Open ]", "[ 📌 Locate ]", "[ 📁 New folder ]", "[ 📸
+      // Shot ]", "[ 💾 Chat ]" and "[ ✴️ Claude ]" with their gaps in the
+      // terminal (narrow: "[ 📁 New ]", "[ 📸 ]", "[ 💾 ]" and "[ ✴️ ]"); about
+      // the same with the desktop's padding.
+      e.props.bodyColumns - labelWidth - 1 - 27 - (narrow ? 32 : 58),
       lines ? 0 : 2,
     )
     // The desktop's buttons have a frame: buttons in rows one above the other
@@ -1758,6 +1777,7 @@ export const register: Register = (on, options) => {
             />
           )}
           <Button key="shot" label={narrow ? '📸' : '📸 Shot'} onPress={() => takeShot($, lines)} />
+          <Button key="save-chat" label={narrow ? '💾' : '💾 Chat'} onPress={() => saveSession($)} />
           {/* A tool: last. */}
           <Button key="claude-target" label={narrow ? '✴️' : '✴️ Claude'} onPress={() => openClaude($)} />
         </Box>
@@ -2136,8 +2156,9 @@ export const register: Register = (on, options) => {
                   <Button key="copy-selected" label="📋 Copy" onPress={() => copyToClipboard($, ticked)} />
                 </Box>
               )}
+              {/* The question and its buttons on one line. */}
               {confirmingDate && (
-                <Box flexDirection="column">
+                <Box flexDirection="row" gap={1} alignItems="center">
                   <Text color="yellow">{`Add the date and time before the name of ${countItems(ticked)}?`}</Text>
                   <Box flexDirection="row" gap={1}>
                     <Button
@@ -2158,7 +2179,7 @@ export const register: Register = (on, options) => {
                 </Box>
               )}
               {confirming && (
-                <Box flexDirection="column">
+                <Box flexDirection="row" gap={1} alignItems="center">
                   <Text color="yellow">
                     {deleteQuestion(ticked)}
                   </Text>

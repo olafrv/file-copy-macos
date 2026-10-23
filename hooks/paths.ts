@@ -340,5 +340,49 @@ export const isHiddenEntry = (entry: string): boolean =>
  * and the clock use; `n` above 1 adds " n" for a second shot in the same
  * second. `word` names the kind ("Pasted").
  */
-export const shotName = (ms: number, offset: number, n = 1, word = 'Screenshot'): string =>
-  `${namePrefix(ms, offset)}${word}${n > 1 ? ` ${n}` : ''}.png`
+export const shotName = (ms: number, offset: number, n = 1, word = 'Screenshot', ext = 'png'): string =>
+  `${namePrefix(ms, offset)}${word}${n > 1 ? ` ${n}` : ''}.${ext}`
+
+/** One message of the conversation, as `$.session.messages()` gives it. */
+export type ChatMessage = {
+  role: 'user' | 'assistant'
+  text: string
+  toolUses: readonly { tool: string; input: Record<string, unknown> }[]
+}
+
+// What a tool call is about, in one line: its own description, else the file,
+// command, pattern or address it was given; cut to 120 characters.
+const toolLine = (tool: string, input: Record<string, unknown>): string => {
+  const about = ['description', 'file_path', 'command', 'pattern', 'url', 'query', 'path']
+    .map(key => input[key])
+    .find((value): value is string => typeof value === 'string' && value.trim() !== '')
+  const line = about === undefined ? tool : `${tool}: ${about.replace(/\s+/g, ' ').trim()}`
+
+  return line.length > 120 ? `${line.slice(0, 119)}…` : line
+}
+
+/**
+ * The conversation as Markdown: a title, then each message under "👤 You" or
+ * "🤖 Claude", each tool call as one quoted line, without its output. Messages
+ * with no text and no tool call (tool results) are left out.
+ */
+export const sessionMarkdown = (title: string, messages: readonly ChatMessage[]): string => {
+  const parts = [`# ${title}`]
+
+  for (const m of messages) {
+    const text = m.text.trim()
+    const tools = m.role === 'assistant' ? m.toolUses.map(use => `> 🔧 ${toolLine(use.tool, use.input)}`) : []
+
+    if (text === '' && tools.length === 0) {
+      continue
+    }
+
+    parts.push(
+      [m.role === 'user' ? '## 👤 You' : '## 🤖 Claude', ...(text === '' ? [] : [text]), ...(tools.length === 0 ? [] : [tools.join('\n')])].join(
+        '\n\n',
+      ),
+    )
+  }
+
+  return `${parts.join('\n\n')}\n`
+}

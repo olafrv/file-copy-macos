@@ -783,6 +783,67 @@ test('the bar shows only in the terminal and the desktop app, not in VS Code or 
   }
 })
 
+test('💾 Chat saves the conversation as Markdown in the target, named like a screenshot', async ($, on) => {
+  const writes: { path: string; text: string }[] = []
+  const toasts: string[] = []
+
+  on('ui.toast', ($, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
+  mock.session(on)
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', () => ({ value: ran('') }))
+  on('clock.now', () => ({ value: Date.UTC(2026, 9, 24, 10, 15, 30) }))
+  fakeFs(on, dir => (dir === '/proj' ? writes.map(w => w.path.slice('/proj/'.length)) : undefined))
+  on('fs.write', ($, e) => {
+    writes.push({ path: e.path, text: e.text })
+    return { value: undefined }
+  })
+  on('session.messages', () => ({
+    value: [
+      { role: 'user', text: 'Save this chat', toolUses: [] },
+      {
+        role: 'assistant',
+        text: 'Done.',
+        toolUses: [
+          { tool_use_id: 't1', tool: 'Bash', input: { command: 'ls', description: 'List files' }, text: 'a.md\nb ```x``` \n' },
+          {
+            tool_use_id: 't2',
+            tool: 'Read',
+            input: { file_path: '/proj/a.md' },
+            text: Array.from({ length: 52 }, (_, i) => `line ${i + 1}`).join('\n'),
+          },
+          { tool_use_id: 't3', tool: 'Grep', input: { pattern: 'x(' }, text: 'bad regex', isError: true },
+          // No output stored: the line alone.
+          { tool_use_id: 't4', tool: 'Glob', input: { pattern: '*.md' } },
+        ],
+      },
+      // A tool result alone: left out.
+      { role: 'user', text: '', toolUses: [] },
+    ],
+  }))
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  await ui.press({ key: 'save-chat' })
+  // No zone read here, so the name is in UTC.
+  expect(writes.map(w => w.path)).toEqual(['/proj/2026-10-24_101530 - Session.md'])
+  // Each tool call is one line; its output is left out.
+  expect(writes[0]?.text).toBe(
+    [
+      '# Claude Code session, 24.10.2026 10:15 UTC',
+      '## 👤 You\n\nSave this chat',
+      '## 🤖 Claude\n\nDone.\n\n> 🔧 Bash: List files\n> 🔧 Read: /proj/a.md\n> 🔧 Grep: x(\n> 🔧 Glob: *.md',
+    ].join('\n\n') + '\n',
+  )
+  expect(toasts.at(-1)).toBe('Saved 2026-10-24_101530 - Session.md')
+
+  // A second one in the same second gets " 2".
+  await ui.press({ key: 'save-chat' })
+  expect(writes.at(-1)?.path).toBe('/proj/2026-10-24_101530 - Session 2.md')
+  await ui.unmount()
+})
+
 test('sizes read as Finder shows them', async () => {
   expect(humanSize(0)).toBe('0 bytes')
   expect(humanSize(1)).toBe('1 byte')
@@ -1793,8 +1854,8 @@ test('a long Target path is shortened: first the text above the project, then th
   // The desktop's padding per button counts too: here three folders still fit.
   expect(fitCrumbs(above, parts, 40, 2)).toEqual({ above: '…/', crumbs: [0, 'gap', 2, 3, 4] })
 
-  // In the band: a terminal of 84 columns, four folders deep, leaves 29 cells
-  // for the path (less the label icon and the five buttons): the project,
+  // In the band: a terminal of 91 columns, four folders deep, leaves 29 cells
+  // for the path (less the label icon and the six buttons): the project,
   // "…", then q3 and reports.
   const tree: Record<string, string[]> = {
     '/Users/me/Documents/Claude/Code/my-project': ['docs/'],
@@ -1810,7 +1871,7 @@ test('a long Target path is shortened: first the text above the project, then th
     plugin: 'file-copy-macos',
     surface: 'terminal',
     ...BAND,
-    props: { ...BAND.props, bodyColumns: 84 },
+    props: { ...BAND.props, bodyColumns: 91 },
   })
   await ui.press({ key: 'list' })
 
