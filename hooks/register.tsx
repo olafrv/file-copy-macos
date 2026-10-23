@@ -899,11 +899,25 @@ const copyClock = async ($: EngineInterface, surface: RenderSurface) => {
 // A new Terminal window in the target, running Claude Code. The folder and the
 // program come in as arguments and are quoted by AppleScript, never put into
 // the script. 110 × 35: the bar's full labels (from 100 columns) and room for
-// the file list (from 35 rows).
+// the file list (from 35 rows). A Terminal that was not running opens its own
+// first window when it starts: Claude Code runs in that one (after at most
+// 5 s of waiting for it), not in a second window. "is running" is asked
+// before "tell", because "tell" itself starts Terminal.
 const CLAUDE_SCRIPT = [
   'on run argv',
+  'set cmd to "cd " & quoted form of (item 1 of argv) & " && " & quoted form of (item 2 of argv)',
+  'set wasRunning to application "Terminal" is running',
   'tell application "Terminal"',
-  'set t to do script "cd " & quoted form of (item 1 of argv) & " && " & quoted form of (item 2 of argv)',
+  'if wasRunning then',
+  'set t to do script cmd',
+  'else',
+  'activate',
+  'repeat 50 times',
+  'if (count of windows) > 0 then exit repeat',
+  'delay 0.1',
+  'end repeat',
+  'set t to do script cmd in window 1',
+  'end if',
   'set number of columns of t to 110',
   'set number of rows of t to 35',
   'activate',
@@ -1652,26 +1666,14 @@ export const register: Register = (on, options) => {
           )}
           <Button
             key="pick"
-            label={narrow ? '📄' : '📄 Files'}
+            label={narrow ? '📄' : '📄 File'}
             onPress={() => pickAndCopy($, 'files')}
           />
           <Button
             key="pick-folder"
-            label={narrow ? '🗂️' : '🗂️ Folders'}
+            label={narrow ? '🗂️' : '🗂️ Folder'}
             onPress={() => pickAndCopy($, 'folders')}
           />
-          <Box key="tip:paste-files">
-            <Button
-              key="paste-files"
-              label={narrow ? '📋' : '📋 Paste'}
-              onPress={() => pasteFromClipboard($)}
-            />
-            {tipsOn && (
-              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-                <Text inverse>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
-              </Box>
-            )}
-          </Box>
           <Box key="tip:latest-desktop">
             <Button key="latest-desktop" label={narrow ? '🧲🖥️' : '🧲 Desktop'} onPress={() => copyNewestFrom($, 'Desktop')} />
             {tipsOn && (
@@ -1744,9 +1746,10 @@ export const register: Register = (on, options) => {
               </Box>
             ))}
           </Box>
-          {/* Real buttons, as Files and Folder in the row above. The most used
-              first: Open, then the two that make something new. */}
+          {/* Real buttons, as Files and Folder in the row above: Open and Locate
+              show the folder, New folder and Shot make something new in it. */}
           <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
+          <Button key="finder-target" label="📌 Locate" onPress={() => showInFinder($, '')} />
           {!naming && (
             <Button
               key="new-folder"
@@ -1755,9 +1758,8 @@ export const register: Register = (on, options) => {
             />
           )}
           <Button key="shot" label={narrow ? '📸' : '📸 Shot'} onPress={() => takeShot($, lines)} />
-          {/* Used less often: last. */}
+          {/* A tool: last. */}
           <Button key="claude-target" label={narrow ? '✴️' : '✴️ Claude'} onPress={() => openClaude($)} />
-          <Button key="finder-target" label="📌 Locate" onPress={() => showInFinder($, '')} />
         </Box>
         {/* The target's content, filtered: the row's label is the filter's. */}
         <Box flexDirection="row" gap={1} marginTop={rowSpace}>
@@ -1778,6 +1780,19 @@ export const register: Register = (on, options) => {
           {filterText !== '' && (
             <Button key="clear-filter" label="🧹 Clear" plain dimColor onPress={() => clearFilter($)} />
           )}
+          {/* Files or an image from the clipboard into the target's content. */}
+          <Box key="tip:paste-files">
+            <Button
+              key="paste-files"
+              label={narrow ? '📋' : '📋 Paste'}
+              onPress={() => pasteFromClipboard($)}
+            />
+            {tipsOn && (
+              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
+              </Box>
+            )}
+          </Box>
           {/* The view: after the filter, used less often. */}
           <Button
             key="refresh"

@@ -81,7 +81,7 @@ The mod is for macOS only, because it uses these macOS commands:
 | `/usr/bin/trash` (macOS 15 and later) | ❌ Delete and 🔁 Overwrite, which move items to the Trash |
 | `/usr/bin/open` | ↗️ Open, 📌 Locate and 📅 (Calendar) |
 | `/usr/sbin/screencapture` | 📸 Shot |
-| `/usr/bin/osascript` | 📄 Files and 🗂️ Folders pickers, 📋 Copy and 📋 Paste (clipboard files and images), ✴️ Claude (Terminal) |
+| `/usr/bin/osascript` | 📄 File and 🗂️ Folder pickers, 📋 Copy and 📋 Paste (clipboard files and images), ✴️ Claude (Terminal) |
 | `/bin/date` | The time zone of the clock |
 | `/usr/bin/git` (optional) | 🔍 Find in git projects. Without git, the mod searches the folders itself |
 
@@ -89,15 +89,15 @@ Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Downloads and the s
 
 ## What it does
 
-The rows of the bar are 📎 Source, 🎯 Target, 🏷️ Filter (the target's content) and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and most buttons show only their icons, to leave room for the fields: 📄 Files, 🗂️ Folders, 📋 Paste, ✴️ Claude, 📸 Shot, 🧲🖥️ Desktop, 🧲⬇️ Downloads, ♻️ Refresh, 🫣 Hide, 📁 New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
+The rows of the bar are 📎 Source, 🎯 Target, 🏷️ Filter (the target's content) and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and most buttons show only their icons, to leave room for the fields: 📄 File, 🗂️ Folder, 📋 Paste, ✴️ Claude, 📸 Shot, 🧲🖥️ Desktop, 🧲⬇️ Downloads, ♻️ Refresh, 🫣 Hide, 📁 New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
 
 **💤 Tips** in the 💡 Finder row turns on help tips (it becomes **✅ Tips**). Then point at 📋 Paste, 🧲 Desktop, 🧲 Downloads or the 💡 Finder tip to see what it does. The other buttons say it in their label. Tips are off by default, because the app shows them at once, without a delay. The mod remembers your choice. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
 ### Copy files and folders
 
 - **Paste paths** into the field and press Enter (or **🧲 Add**). In Finder, Option+Cmd+C copies the paths of the selected items. In a terminal you can also drag files into the field.
-- **📄 Files** and **🗂️ Folders** open the macOS picker. You can select several items: hold Cmd and click each one.
-- **📋 Paste** adds the files and folders you copied in Finder with Cmd+C. With no files on the clipboard, it saves a copied image (for example a screenshot taken with Ctrl+Cmd+Shift+4, or "Copy Image" in a browser) into the target as a PNG, named by the local time, for example `2026-10-21_194512 - Pasted.png`. Text on the clipboard is ignored.
+- **📄 File** and **🗂️ Folder** open the macOS picker. You can select several items: hold Cmd and click each one.
+- **📋 Paste** (in the 🏷️ Filter row, after 🔍 Find) adds the files and folders you copied in Finder with Cmd+C. With no files on the clipboard, it saves a copied image (for example a screenshot taken with Ctrl+Cmd+Shift+4, or "Copy Image" in a browser) into the target as a PNG, named by the local time, for example `2026-10-21_194512 - Pasted.png`. Text on the clipboard is ignored.
 - **🧲 Desktop** copies the newest file or folder on your Desktop, for example the screenshot you just took.
 - **🧲 Downloads** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
@@ -117,10 +117,10 @@ If a name already exists in the target, the mod asks first:
 ### Target and content
 
 - **🎯 Target** is the project root at the start. Each folder of its path is a button: a click makes that folder the target. The path starts at the project folder (`…/my-project/docs`); point at it to see the full path. If it is still too long, the folders in the middle become "…". **↗️ Open** opens the target folder in Finder.
+- **📌 Locate** shows the target folder in its parent folder, selected.
 - **📁 New folder** creates a folder in the target and opens it.
 - **📸 Shot** takes a screenshot straight into the target: drag an area, or press Space and click a window; Esc cancels. The image is named by the local time, for example `2026-10-16_173756 - Screenshot.png`. It needs the macOS **Screen Recording** permission (System Settings > Privacy & Security > Screen & System Audio Recording) for the app that runs Claude Code: for the desktop app the entry **Claude** ("Claude Desktop" alone may not be enough), for a terminal session your terminal app. Quit and reopen the app after turning it on. Without it, a toast says the screenshot could not be taken.
 - **✴️ Claude** opens a new Terminal window of 110 columns and 35 rows (so the bar has room) in the target and starts Claude Code there (it looks for the `claude` program in the usual install folders; if there is none, a toast says so). It always uses the Terminal app, also from the desktop app. The first time, macOS asks whether Claude (or your terminal app) may control Terminal: allow it. To change it later: System Settings > Privacy & Security > Automation.
-- **📌 Locate** shows the target folder in its parent folder, selected.
 - **🏷️ Filter:** is always shown. While you type, it shows only the items of the target folder whose name contains the text (case is ignored). Typing in it opens the list. **🧹 Clear** removes the filter, and so does **🫣 Hide**.
 - **🔍 Find** (or Enter) searches the target folder and all folders below it. The table then gets a **Folder** column with each item's folder. Point at a folder there to see its full path; a click opens it. All actions work on the items found, and 📝 Ren keeps an item in its own folder. Typing in the filter again, 🧹 Clear or opening a folder ends the search.
   - In a git project, the search follows `.gitignore`: ignored files are not found. To skip a folder only on your Mac, add it to `.git/info/exclude`.

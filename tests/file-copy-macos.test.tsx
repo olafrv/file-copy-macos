@@ -759,6 +759,9 @@ test('✴️ Claude opens Claude Code in a new Terminal window in the target', a
   expect(scripts).toHaveLength(1)
   expect(scripts[0]?.slice(-2)).toEqual(["/proj/it's here", '/Users/me/.local/bin/claude'])
   expect(scripts[0]?.join(' ')).toContain('quoted form of (item 2 of argv)')
+  // A Terminal that was not running: its own first window runs Claude Code.
+  expect(scripts[0]).toContain('set wasRunning to application "Terminal" is running')
+  expect(scripts[0]).toContain('set t to do script cmd in window 1')
   await ui.unmount()
 })
 
@@ -1988,8 +1991,9 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   })
   await ui.press({ key: 'list' })
 
-  const source = ['pick', 'pick-folder', 'paste-files', 'latest-desktop', 'latest-download']
-  expect(await Promise.all(source.map(key => labelOf(ui, key)))).toEqual(['📄', '🗂️', '📋', '🧲🖥️', '🧲⬇️'])
+  const source = ['pick', 'pick-folder', 'latest-desktop', 'latest-download']
+  expect(await Promise.all(source.map(key => labelOf(ui, key)))).toEqual(['📄', '🗂️', '🧲🖥️', '🧲⬇️'])
+  expect(await labelOf(ui, 'paste-files')).toBe('📋')
   // The Target row's buttons that make something new.
   expect(await labelOf(ui, 'new-folder')).toBe('📁 New')
   expect(await labelOf(ui, 'shot')).toBe('📸')
@@ -2006,12 +2010,14 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   const sourceRow = 2 + 1 + 20 + buttons.reduce((sum, w) => sum + w + 1, 0)
   expect(sourceRow).toBeLessThanOrEqual(75)
 
-  // Content row: the icon label, Refresh, Hide, New folder, .files, the
-  // filter box (24), Clear and the page control "◀ 1/2 (#7) ▶".
+  // Filter row: the icon label, the filter box (24), Clear, "[ 📋 ]",
+  // Refresh, Hide, .files and the page control "◀ 1/2 (#7) ▶".
   const plain = await Promise.all(
-    ['refresh', 'list', 'new-folder', 'dotfiles'].map(async key => cells(await labelOf(ui, key))),
+    ['refresh', 'list', 'dotfiles'].map(async key => cells(await labelOf(ui, key))),
   )
-  const contentRow = 2 + 1 + plain.reduce((sum, w) => sum + w + 1, 0) + 24 + 1 + 8 + 1 + cells('◀ 1/2 (#7) ▶')
+  const pasteButton = cells(await labelOf(ui, 'paste-files')) + 4
+  const contentRow =
+    2 + 1 + 24 + 1 + 8 + 1 + pasteButton + 1 + plain.reduce((sum, w) => sum + w + 1, 0) + cells('◀ 1/2 (#7) ▶')
   expect(contentRow).toBeLessThanOrEqual(75)
   // The page holds 4 items in 12 rows.
   expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
