@@ -1936,7 +1936,7 @@ export const register: Register = (on, options) => {
                     </Box>
                     {columnLine()}
                     <Box width={ACTIONS_WIDTH + 2} paddingX={1}>
-                      <Text bold>Actions</Text>
+                      <Text>Actions</Text>
                     </Box>
                   </Box>
                   {lines ? (
