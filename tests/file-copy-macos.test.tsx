@@ -844,6 +844,92 @@ test('💾 Chat saves the conversation as Markdown in the target, named like a s
   await ui.unmount()
 })
 
+test('below 100 columns the actions show icons alone, each with a tip while Tips is on', async ($, on) => {
+  on('store.set', () => ({ value: undefined }))
+  on('session.root', () => ({ value: '/proj' }))
+  on('process.run', () => ({ value: ran('') }))
+  fakeFs(on, dir => (dir === '/proj' ? ['a.pdf'] : undefined))
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const narrow = await $.ui.mount({
+      plugin: 'file-copy-macos',
+      surface,
+      ...BAND,
+      props: { ...BAND.props, bodyColumns: 85 },
+    })
+    await narrow.press({ key: 'list' })
+    const labels = await Promise.all(
+      ['open', 'rename', 'date', 'mention', 'copy', 'show'].map(
+        async id => (await narrow.find({ key: `${id}:a.pdf` }))?.props.label,
+      ),
+    )
+    expect(labels).toEqual(['↗️', '📝', '📅', '💬', '📋', '📌'])
+    // Tips off: no tip; on: each icon says what it does, and so does 📅.
+    expect(await narrow.find({ type: 'Text', text: ' Rename ' })).toBeUndefined()
+    await narrow.press({ key: 'tips' })
+    expect((await narrow.find({ type: 'Text', text: ' Rename ' }))?.props.inverse).toBe(true)
+    expect(await narrow.find({ type: 'Text', text: ' Show in Finder ' })).toBeDefined()
+    await narrow.press({ key: 'tips' })
+    await narrow.press({ key: 'list' })
+    await narrow.unmount()
+
+    // From 100 columns: icon and word, no tip needed.
+    const wide = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    await wide.press({ key: 'list' })
+    expect((await wide.find({ key: 'open:a.pdf' }))?.props.label).toBe('↗️ Open')
+    await wide.press({ key: 'list' })
+    await wide.unmount()
+  }
+})
+
+test('the header actions work on the ticked items; Ren and Locate on one', async ($, on) => {
+  const toasts: string[] = []
+  const opened: (readonly string[])[] = []
+
+  on('ui.toast', ($, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
+  on('session.root', () => ({ value: '/proj' }))
+  fakeFs(on, dir => (dir === '/proj' ? ['a.pdf', 'b.pdf'] : undefined))
+  on('process.run', ($, e) => {
+    if (e.argv[0] === '/usr/bin/open') {
+      opened.push(e.argv)
+    }
+
+    return { value: ran('') }
+  })
+
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
+  await ui.press({ key: 'list' })
+  // Nothing ticked: the header's buttons are dim and say so.
+  expect((await ui.find({ key: 'open-selected' }))?.props.dimColor).toBe(true)
+  await ui.press({ key: 'open-selected' })
+  expect(toasts.at(-1)).toBe('Tick items first')
+
+  await ui.press({ key: 'tick:a.pdf' })
+  await ui.press({ key: 'tick:b.pdf' })
+  expect((await ui.find({ key: 'open-selected' }))?.props.dimColor).toBe(false)
+  await ui.press({ key: 'open-selected' })
+  expect(opened).toEqual([
+    ['/usr/bin/open', '/proj/a.pdf'],
+    ['/usr/bin/open', '/proj/b.pdf'],
+  ])
+  await ui.press({ key: 'rename-selected' })
+  expect(toasts.at(-1)).toBe('Ren works on one item. Tick only one.')
+  await ui.press({ key: 'show-selected' })
+  expect(toasts.at(-1)).toBe('Locate works on one item. Tick only one.')
+
+  // One ticked: Ren opens its rename field.
+  await ui.press({ key: 'tick:b.pdf' })
+  await ui.press({ key: 'rename-selected' })
+  expect(await ui.find({ key: 'rename-field:a.pdf' })).toBeDefined()
+  await ui.press({ key: 'cancel-rename' })
+  await ui.press({ key: 'tick:a.pdf' })
+  await ui.press({ key: 'list' })
+  await ui.unmount()
+})
+
 test('sizes read as Finder shows them', async () => {
   expect(humanSize(0)).toBe('0 bytes')
   expect(humanSize(1)).toBe('1 byte')
@@ -1124,25 +1210,34 @@ test('Content is a table: header, tick, name, size and actions per row', async (
 
     expect((await ui.find({ key: 'sort-name' }))?.props.label).toBe('Name ▲')
     expect((await ui.find({ key: 'sort-size' }))?.props.label).toBe('Size')
-    expect(await ui.find({ type: 'Text', text: 'Actions' })).toBeDefined()
+    // The header holds the rows' actions, for the ticked items.
+    expect((await ui.find({ key: 'open-selected' }))?.props.label).toBe('↗️ Open')
+    expect((await ui.find({ key: 'show-selected' }))?.props.label).toBe('📌 Locate')
 
     expect((await ui.find({ key: 'tick:a.pdf' }))?.props.label).toBe(box(surface, false))
     expect((await ui.find({ key: 'tick:docs/' }))?.props.label).toBe(box(surface, false))
     expect(await ui.find({ key: 'rename:docs/' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '13 KB' })).toBeDefined()
 
-    // A name too long for its column ends in "…" and fits it.
-    const label = String((await ui.find({ key: `file:${long}` }))?.props.label)
-    expect(label.endsWith('…')).toBe(true)
+    // A name too long for its column: the terminal cuts it with "…" to fit;
+    // the desktop gives the whole name to a text that cuts itself at the end
+    // of its cell, which takes the room the other cells leave.
+    const button = await ui.find({ key: `file:${long}` })
+    const label = String(button?.props.label)
+    expect(label.endsWith('…')).toBe(surface === 'terminal')
+    if (surface === 'desktop') {
+      expect((await ui.find({ type: 'Text', text: `📄 ${long}` }))?.props.wrap).toBe('truncate-end')
+    }
     // Pointing at it shows the whole name; a name that fits gets no tip.
     expect((await ui.find({ type: 'Text', text: ` ${long} ` }))?.props.inverse).toBe(true)
     expect(await ui.find({ type: 'Text', text: ' a.pdf ' })).toBeUndefined()
-    // The table takes the whole width (100). In the terminal tick (2), size
-    // (9), actions (47), padding and frame (10) and 3 column lines leave 29
-    // for the name; on the desktop tick (5, no padding), size, actions,
-    // padding and frame (8) leave 31.
-    const nameWidth = surface === 'terminal' ? 29 : 31
-    expect([...label].length + 1).toBe(nameWidth)
+    // The terminal's table takes the whole width (100): tick (2), size (9),
+    // actions (47), padding and frame (10) and 3 column lines leave 29 for
+    // the name.
+    const nameWidth = 29
+    if (surface === 'terminal') {
+      expect([...label].length + 1).toBe(nameWidth)
+    }
 
     // A frame on both; column lines and a header line in the terminal only,
     // as the desktop's text font does not match its column widths.
@@ -1366,6 +1461,8 @@ test('the Finder row shows the clock and the version on both surfaces; a click c
     // 📅 before it opens the Calendar app.
     await ui.press({ key: 'calendar' })
     expect(runs.at(-1)).toEqual(['/usr/bin/open', '-a', 'Calendar'])
+    await ui.press({ key: 'calculator' })
+    expect(runs.at(-1)).toEqual(['/usr/bin/open', '-a', 'Calculator'])
 
     await ui.press({ key: 'clock' })
     // Copied as the start of a file name: year first, so it sorts.
@@ -1854,8 +1951,8 @@ test('a long Target path is shortened: first the text above the project, then th
   // The desktop's padding per button counts too: here three folders still fit.
   expect(fitCrumbs(above, parts, 40, 2)).toEqual({ above: '…/', crumbs: [0, 'gap', 2, 3, 4] })
 
-  // In the band: a terminal of 91 columns, four folders deep, leaves 29 cells
-  // for the path (less the label icon and the six buttons): the project,
+  // In the band: a terminal of 70 columns, four folders deep, leaves 29 cells
+  // for the path (less the label icon and the three buttons): the project,
   // "…", then q3 and reports.
   const tree: Record<string, string[]> = {
     '/Users/me/Documents/Claude/Code/my-project': ['docs/'],
@@ -1871,7 +1968,7 @@ test('a long Target path is shortened: first the text above the project, then th
     plugin: 'file-copy-macos',
     surface: 'terminal',
     ...BAND,
-    props: { ...BAND.props, bodyColumns: 91 },
+    props: { ...BAND.props, bodyColumns: 70 },
   })
   await ui.press({ key: 'list' })
 
@@ -1905,12 +2002,12 @@ test('a page shows as many items as the band has rows for: 4 to 10', async ($, o
   on('process.run', () => ({ value: ran('') }))
   fakeFs(on, dir => (dir === '/proj' ? names : undefined))
 
-  // In the terminal the list view itself takes 10 rows: Source, Target,
-  // Content, the table's frame, header and header line, the selection row
-  // and the Finder row with room to wrap.
+  // In the terminal the list view itself takes 11 rows: Source, Target,
+  // Tools, Filter, the table's frame, header and header line, the selection
+  // row and the Finder row with room to wrap.
   for (const [maxRows, perPage, pages] of [
     [40, 10, 3],
-    [17, 7, 4],
+    [18, 7, 4],
     [10, 4, 6],
   ] as const) {
     const ui = await $.ui.mount({
@@ -2087,7 +2184,7 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   const tip = 'Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋'
   expect(await ui.find({ type: 'Text', text: tip })).toBeDefined()
   // The clock shows the time alone there.
-  const finderRow = 2 + 1 + cells(tip) + 1 + cells('· 💤') + 1 + cells('📅') + 1 + cells('01:18 · v1.19.1')
+  const finderRow = 2 + 1 + cells(tip) + 1 + cells('· 💤') + 1 + cells('01:18 · v1.19.1')
   expect(finderRow).toBeLessThanOrEqual(75)
   await ui.unmount()
 

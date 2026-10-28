@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Olaf Reitmaier
 
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderSurface } from 'claude-code'
+import type { EngineInterface, Register, RenderElement, RenderSurface } from 'claude-code'
 
 import type { CopyResult, Pending, SortKey } from '../types'
 import {
@@ -207,7 +207,10 @@ const DESKTOP_STRIPE = '#8080801f'
 const DESKTOP_GRID = '#80808059'
 // About a pixel each: a row is about twice as high as a cell is wide.
 const GRID_LINE = 0.15
-const GRID_ROW_LINE = 0.07
+const GRID_ROW_LINE = 0.1
+// A table row on the desktop: as high as its buttons, which are taller than a
+// row of text.
+const TABLE_ROW_HEIGHT = 1.4
 const DESKTOP_HOVER = '#80808038'
 
 // The file list's columns, in terminal cells: the tick box, the size
@@ -218,6 +221,11 @@ const TICK_WIDTH = 2
 const DESKTOP_TICK_WIDTH = 5
 const SIZE_WIDTH = 9
 const ACTIONS_WIDTH = 47
+// The actions as icons alone ("↗️ 📝 📅 💬 📋 📌"), below NARROW_COLUMNS. The
+// desktop draws each as a native button with its own padding, about 37 pixels,
+// so the six take about 24 of its cells.
+const ACTIONS_ICON_WIDTH = 17
+const DESKTOP_ACTIONS_ICON_WIDTH = 26
 const MIN_NAME_WIDTH = 16
 
 // An icon and a name cut to `width` cells with "…"; the icon takes 2 cells.
@@ -600,6 +608,60 @@ const renameFile = async ($: EngineInterface, entry: string, raw: string) => {
   $.ui.toast(`Renamed ${oldName} to ${to}`)
 }
 
+// The table's actions, in their order: as on the Target row, Open first and
+// Locate last. [id, icon, word, tip with icons alone, tip in the header].
+const ACTIONS = [
+  ['open', '↗️', 'Open', 'Open', 'Open the ticked items'],
+  ['rename', '📝', 'Ren', 'Rename', 'Rename the ticked item'],
+  ['date', '📅', 'Date', 'Add the date to the name', 'Add the date to the ticked items'],
+  ['mention', '💬', 'Ask', 'Ask Claude about it', 'Ask Claude about the ticked items'],
+  ['copy', '📋', 'Copy', 'Copy to the clipboard', 'Copy the ticked items to the clipboard'],
+  ['show', '📌', 'Locate', 'Show in Finder', 'Show the ticked item in Finder'],
+] as const
+type ActionId = (typeof ACTIONS)[number][0]
+
+// An action on one item (its row) or, from the header, on the ticked items.
+// Ren and Locate take one item; Date on several asks first.
+const runAction = async ($: EngineInterface, id: ActionId, names: readonly string[], isHeader: boolean) => {
+  const [one] = names
+
+  if (one === undefined) {
+    $.ui.toast('Tick items first')
+    return
+  }
+
+  if ((id === 'rename' || id === 'show') && names.length > 1) {
+    $.ui.toast(`${id === 'rename' ? 'Ren' : 'Locate'} works on one item. Tick only one.`)
+    return
+  }
+
+  switch (id) {
+    case 'open':
+      for (const name of names) {
+        await openWithDefaultApp($, name)
+      }
+      return
+    case 'rename':
+      await startRename($, one)
+      return
+    case 'date':
+      if (isHeader && names.length > 1) {
+        await update($, isConfirmingDate, () => true)
+      } else {
+        await startDate($, one)
+      }
+      return
+    case 'mention':
+      await mention($, names)
+      return
+    case 'copy':
+      await copyToClipboard($, names)
+      return
+    case 'show':
+      await showInFinder($, one)
+  }
+}
+
 // After a rename: ticks, search results, the Copied line and Claude follow the
 // new name.
 const followRename = async ($: EngineInterface, dir: string, entry: string, toPath: string) => {
@@ -880,12 +942,12 @@ const showInFinder = async ($: EngineInterface, name: string) => {
   }
 }
 
-// 📅 before the clock: macOS's Calendar app.
-const openCalendar = async ($: EngineInterface) => {
-  const { exitCode } = await $.process.run(['/usr/bin/open', '-a', 'Calendar'])
+// 📅 Calendar and 🧮 Calculator in 🧰 Tools: macOS's own apps.
+const openApp = async ($: EngineInterface, app: 'Calendar' | 'Calculator') => {
+  const { exitCode } = await $.process.run(['/usr/bin/open', '-a', app])
 
   if (exitCode !== 0) {
-    $.ui.toast('Could not open Calendar')
+    $.ui.toast(`Could not open ${app}`)
   }
 }
 
@@ -1535,7 +1597,7 @@ export const register: Register = (on, options) => {
     )
     const arrow = (key: SortKey) => (by === key ? (desc ? ' ▼' : ' ▲') : '')
     // Items per page: what the band's rows leave after its other rows. They
-    // are Source with its hint and pasted list; Target; Content with the New
+    // are Source with its hint and pasted list; Target; Tools; Content with the New
     // folder field and ⤴️ up; the table's frame, header and header line
     // (terminal); a search's note and "Searching..."; the selection row (kept
     // free, so ticking does not change the page); the Finder row, which may
@@ -1546,6 +1608,7 @@ export const register: Register = (on, options) => {
       1 +
       ((await read($, hint)) !== null ? 1 : 0) +
       parsePaths(await read($, draft)).length +
+      1 +
       1 +
       1 +
       (naming ? 2 : 0) +
@@ -1569,9 +1632,28 @@ export const register: Register = (on, options) => {
     const lines = e.surface === 'terminal'
     // A line between two columns: "│" in the terminal; on the desktop a box a
     // fraction of a cell wide (about a pixel; sizes are cells, not pixels), as
-    // tall as the row, so it does not depend on the font.
+    // tall as the row. It never shrinks, or a full row squeezes it away.
     const columnLine = () =>
-      lines ? <Text dimColor>│</Text> : <Box width={GRID_LINE} backgroundColor={DESKTOP_GRID} />
+      lines ? (
+        <Text dimColor>│</Text>
+      ) : (
+        <Box width={GRID_LINE} height={TABLE_ROW_HEIGHT} flexShrink={0} backgroundColor={DESKTOP_GRID} />
+      )
+    // The Name cell. The terminal counts cells exactly: a fixed width. The
+    // desktop draws buttons and text in its own sizes, so there the cell takes
+    // what the other cells leave (they keep their own width), and the name is
+    // cut with "…" by the desktop itself: nothing can stick out of the table.
+    const nameButton = (key: string, text: string, onPress: () => unknown): RenderElement =>
+      lines ? (
+        <Button key={key} label={fitName(text, nameWidth)} plain onPress={onPress} />
+      ) : (
+        <Button key={key} label={text} plain onPress={onPress}>
+          <Text wrap="truncate-end">{text}</Text>
+        </Button>
+      )
+    // The desktop's buttons are taller than a row: a table row as high as they
+    // are, its cells centered in it.
+    const tableRow = lines ? {} : ({ height: TABLE_ROW_HEIGHT, alignItems: 'center' } as const)
     // Each column has a cell of padding on both sides (on the desktop, not the
     // tick box), the frame 2 sides, and in the terminal 3 "│" between them.
     const tickWidth = lines ? TICK_WIDTH : DESKTOP_TICK_WIDTH
@@ -1580,9 +1662,27 @@ export const register: Register = (on, options) => {
     // each row stays on one line. 🧲🖥️ and 🧲⬇️ keep Desktop and Downloads
     // apart; 👻 .files shows its state by brightness.
     const narrow = lines && e.props.bodyColumns < NARROW_COLUMNS
+    // Below NARROW_COLUMNS, on both surfaces, the table's actions show their
+    // icons alone, so the Name column keeps room.
+    const iconOnly = e.props.bodyColumns < NARROW_COLUMNS
+    const actionsWidth = iconOnly ? (lines ? ACTIONS_ICON_WIDTH : DESKTOP_ACTIONS_ICON_WIDTH) : ACTIONS_WIDTH
+    // A button that shows its icon alone says what it does in a tip, while 💤
+    // Tips is on: shown while the pointer is over it, below it (`top` 1) or,
+    // in the table, above it (-1). `tip` null: the label says enough.
+    const withTip = (key: string, tip: string | null, button: RenderElement, top = 1): RenderElement =>
+      tip === null || !tipsOn ? (
+        button
+      ) : (
+        <Box key={`tip:${key}`}>
+          {button}
+          <Box position="absolute" top={top} left={0} display="none" hover={{ display: 'flex' }}>
+            <Text inverse>{` ${tip} `}</Text>
+          </Box>
+        </Box>
+      )
     const labelWidth = narrow ? ICON_LABEL_WIDTH : lines ? LABEL_WIDTH : DESKTOP_LABEL_WIDTH
     const label = (icon: string, word: string) => (narrow ? icon : `${icon} ${word}:`)
-    // The Target path: what is left of the row after the label and the six
+    // The Target path: what is left of the row after the label and the three
     // buttons (with their padding on the desktop).
     const pathParts = [baseName(root), ...(dir === '' ? [] : dir.split('/'))]
     // The part above the project never changes while one works in it: "…/"
@@ -1590,27 +1690,31 @@ export const register: Register = (on, options) => {
     const path = fitCrumbs(
       '…/',
       pathParts,
-      // The buttons "[ ↗️ Open ]", "[ 📌 Locate ]", "[ 📁 New folder ]", "[ 📸
-      // Shot ]", "[ 💾 Chat ]" and "[ ✴️ Claude ]" with their gaps in the
-      // terminal (narrow: "[ 📁 New ]", "[ 📸 ]", "[ 💾 ]" and "[ ✴️ ]"); about
-      // the same with the desktop's padding.
-      e.props.bodyColumns - labelWidth - 1 - 27 - (narrow ? 32 : 58),
+      // The buttons "[ ↗️ Open ]", "[ 📌 Locate ]" and "[ 📁 New folder ]" with
+      // their gaps in the terminal (narrow: "[ 📁 New ]"); about the same with
+      // the desktop's padding.
+      e.props.bodyColumns - labelWidth - 1 - 27 - (narrow ? 11 : 18),
       lines ? 0 : 2,
     )
     // The desktop's buttons have a frame: buttons in rows one above the other
-    // touched. A part of a row keeps them apart; the terminal needs none.
-    const rowSpace = lines ? 0 : 0.3
+    // touched (they are taller than a row). A whole row keeps them apart; the
+    // terminal needs none. On the desktop a row that does not fit wraps its
+    // buttons to a next line (the same space apart) instead of cutting them off.
+    const rowSpace = lines ? 0 : 1
     // The desktop draws "☐" from a text font, narrow and cut at the left;
     // color emoji fill their square there.
     const tick = (isOn: boolean) => (lines ? (isOn ? '☑' : '☐') : isOn ? '✅' : '⬜')
     // The Folder column, during a search, adds its padding and a "│".
     const frame =
-      tickWidth + SIZE_WIDTH + ACTIONS_WIDTH + (lines ? 13 : 8) + (showFolder ? (lines ? 3 : 2) : 0)
+      tickWidth + SIZE_WIDTH + actionsWidth + (lines ? 13 : 8) + (showFolder ? (lines ? 3 : 2) : 0)
     // The table takes the whole width of the band; Name and Folder share what
     // the other columns leave, Folder 40 percent of it.
     const textWidth = Math.max(MIN_NAME_WIDTH, e.props.bodyColumns - frame)
     const folderWidth = showFolder ? Math.floor(textWidth * 0.4) : 0
     const nameWidth = textWidth - folderWidth
+    const nameCell = lines
+      ? ({ width: nameWidth + 2, flexShrink: 0 } as const)
+      : ({ flexGrow: 1, flexShrink: 1, minWidth: 0, overflow: 'hidden' } as const)
     const tableWidth = textWidth + frame
     const showResult = result !== null && !hidden && !isBusy && ask === null
     // The Hide button sits on the last result line drawn.
@@ -1634,84 +1738,96 @@ export const register: Register = (on, options) => {
           <Box width={labelWidth} flexShrink={0}>
             <Text>{label('📎', 'Source')}</Text>
           </Box>
-          {/* The desktop draws the field at its own width: a growing box there
-              would leave a gap before the buttons. */}
-          <Box flexGrow={lines ? 1 : 0}>
-            <Input
-              key={`source-${await read($, fieldId)}`}
-              value={startText === '' ? undefined : startText}
-              placeholder={isBusy ? 'Copying...' : 'Paths ↵'}
-              submitLabel="🧲 Add"
-              onInput={async (value: string) => {
-                await update($, draft, () => value)
-                await checkPastedDirs($, value)
+          {/* The row's buttons: on the desktop they wrap to a next line, which
+              starts under the first of them, not under the label. */}
+          <Box flexDirection="row" gap={1} alignItems="center" flexGrow={1} flexShrink={1} flexWrap={lines ? undefined : 'wrap'} rowGap={rowSpace}>
+            {/* The desktop draws the field at its own width: a growing box there
+                would leave a gap before the buttons. */}
+            <Box flexGrow={lines ? 1 : 0}>
+              <Input
+                key={`source-${await read($, fieldId)}`}
+                value={startText === '' ? undefined : startText}
+                placeholder={isBusy ? 'Copying...' : 'Paths ↵'}
+                submitLabel="🧲 Add"
+                onInput={async (value: string) => {
+                  await update($, draft, () => value)
+                  await checkPastedDirs($, value)
 
-                if (message !== null) {
-                  await update($, hint, () => null)
-                }
-
-                if (!hidden) {
-                  await update($, isHidden, () => true)
-                }
-              }}
-              onSubmit={async (value: string) => {
-                const sources = parsePaths(value)
-
-                if (sources.length === 0) {
-                  // An empty Enter while the picker is open, or just after it
-                  // closed (its Open key), is not the person's Enter here.
-                  const isFromPicker = isPicking || (await $.clock.now()) < pickEndedAt + 1000
-
-                  if (!isFromPicker) {
-                    await update($, hint, () => NO_PATH_HINT)
+                  if (message !== null) {
+                    await update($, hint, () => null)
                   }
 
-                  return
-                }
+                  if (!hidden) {
+                    await update($, isHidden, () => true)
+                  }
+                }}
+                onSubmit={async (value: string) => {
+                  const sources = parsePaths(value)
 
-                await update($, hint, () => null)
-                await update($, draft, () => '')
-                await update($, seed, () => '')
-                await update($, pastedDirs, () => [])
-                await update($, fieldId, id => id + 1)
-                await copyIntoProject($, sources)
-              }}
-            />
-          </Box>
-          {count > 0 && (
-            <Text dimColor>
-              {count === 1 ? '1 item' : `${count} items`}
-            </Text>
-          )}
-          <Button
-            key="pick"
-            label={narrow ? '📄' : '📄 File'}
-            onPress={() => pickAndCopy($, 'files')}
-          />
-          <Button
-            key="pick-folder"
-            label={narrow ? '🗂️' : '🗂️ Folder'}
-            onPress={() => pickAndCopy($, 'folders')}
-          />
-          <Box key="tip:latest-desktop">
-            <Button key="latest-desktop" label={narrow ? '🧲🖥️' : '🧲 Desktop'} onPress={() => copyNewestFrom($, 'Desktop')} />
-            {tipsOn && (
-              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-                <Text inverse>{` Copy newest item of ~/Desktop, for example a screenshot `}</Text>
-              </Box>
+                  if (sources.length === 0) {
+                    // An empty Enter while the picker is open, or just after it
+                    // closed (its Open key), is not the person's Enter here.
+                    const isFromPicker = isPicking || (await $.clock.now()) < pickEndedAt + 1000
+
+                    if (!isFromPicker) {
+                      await update($, hint, () => NO_PATH_HINT)
+                    }
+
+                    return
+                  }
+
+                  await update($, hint, () => null)
+                  await update($, draft, () => '')
+                  await update($, seed, () => '')
+                  await update($, pastedDirs, () => [])
+                  await update($, fieldId, id => id + 1)
+                  await copyIntoProject($, sources)
+                }}
+              />
+            </Box>
+            {count > 0 && (
+              <Text dimColor>
+                {count === 1 ? '1 item' : `${count} items`}
+              </Text>
             )}
-          </Box>
-          <Box key="tip:latest-download">
-            <Button
-              key="latest-download"
-              label={narrow ? '🧲⬇️' : '🧲 Downloads'}
-              onPress={() => copyNewestFrom($, 'Downloads')}
-            />
-            {tipsOn && (
-              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-                <Text inverse>{` Copy newest item of ~/Downloads `}</Text>
-              </Box>
+            {withTip(
+              'pick',
+              narrow ? 'Pick files to copy into the target' : null,
+              <Button
+                key="pick"
+                label={narrow ? '📄' : '📄 File'}
+                onPress={() => pickAndCopy($, 'files')}
+              />,
             )}
+            {withTip(
+              'pick-folder',
+              narrow ? 'Pick folders to copy into the target' : null,
+              <Button
+                key="pick-folder"
+                label={narrow ? '🗂️' : '🗂️ Folder'}
+                onPress={() => pickAndCopy($, 'folders')}
+              />,
+            )}
+            <Box key="tip:latest-desktop">
+              <Button key="latest-desktop" label={narrow ? '🧲🖥️' : '🧲 Desktop'} onPress={() => copyNewestFrom($, 'Desktop')} />
+              {tipsOn && (
+                <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                  <Text inverse>{` Copy newest item of ~/Desktop, for example a screenshot `}</Text>
+                </Box>
+              )}
+            </Box>
+            <Box key="tip:latest-download">
+              <Button
+                key="latest-download"
+                label={narrow ? '🧲⬇️' : '🧲 Downloads'}
+                onPress={() => copyNewestFrom($, 'Downloads')}
+              />
+              {tipsOn && (
+                <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                  <Text inverse>{` Copy newest item of ~/Downloads `}</Text>
+                </Box>
+              )}
+            </Box>
           </Box>
         </Box>
         {message !== null && (
@@ -1735,125 +1851,150 @@ export const register: Register = (on, options) => {
             </Box>
           </Box>
         )}
-        <Box flexDirection="row" gap={1} marginTop={rowSpace}>
+        <Box flexDirection="row" alignItems="flex-start" gap={1} marginTop={rowSpace}>
           <Box width={labelWidth} flexShrink={0}>
             <Text>{label('🎯', 'Target')}</Text>
           </Box>
-          {/* The path: the part above the project as text, then one button per
-              folder from the project down; a click makes it the target. */}
-          {/* The path from the project down, shortened to fit the row (see
-              fitCrumbs); a keyed Box, so pointing at it shows the full path. */}
-          <Box key="target-path" flexDirection="row" flexShrink={1}>
-            <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
-              <Text inverse>{` ${shortPath(target)} `}</Text>
-            </Box>
-            <Text dimColor>{path.above}</Text>
-            {path.crumbs.map((crumb, at) => (
-              <Box key={`crumb-box:${crumb}`} flexDirection="row">
-                {at > 0 && <Text dimColor>/</Text>}
-                {crumb === 'gap' ? (
-                  <Text dimColor>…</Text>
-                ) : (
-                  <Button
-                    key={`crumb:${crumb}`}
-                    label={pathParts[crumb] ?? ''}
-                    plain
-                    dimColor={crumb < pathParts.length - 1}
-                    onPress={() => openFolder($, pathParts.slice(1, crumb + 1).join('/'))}
-                  />
-                )}
+          {/* The row's buttons: on the desktop they wrap to a next line, which
+              starts under the first of them, not under the label. */}
+          <Box flexDirection="row" gap={1} alignItems="center" flexGrow={1} flexShrink={1} flexWrap={lines ? undefined : 'wrap'} rowGap={rowSpace}>
+            {/* The path: the part above the project as text, then one button per
+                folder from the project down; a click makes it the target. */}
+            {/* The path from the project down, shortened to fit the row (see
+                fitCrumbs); a keyed Box, so pointing at it shows the full path. */}
+            <Box key="target-path" flexDirection="row" flexShrink={1}>
+              <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+                <Text inverse>{` ${shortPath(target)} `}</Text>
               </Box>
-            ))}
+              <Text dimColor>{path.above}</Text>
+              {path.crumbs.map((crumb, at) => (
+                <Box key={`crumb-box:${crumb}`} flexDirection="row">
+                  {at > 0 && <Text dimColor>/</Text>}
+                  {crumb === 'gap' ? (
+                    <Text dimColor>…</Text>
+                  ) : (
+                    <Button
+                      key={`crumb:${crumb}`}
+                      label={pathParts[crumb] ?? ''}
+                      plain
+                      dimColor={crumb < pathParts.length - 1}
+                      onPress={() => openFolder($, pathParts.slice(1, crumb + 1).join('/'))}
+                    />
+                  )}
+                </Box>
+              ))}
+            </Box>
+            {/* Real buttons, as Files and Folder in the row above: Open and Locate
+                show the folder, New folder and Shot make something new in it. */}
+            <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
+            <Button key="finder-target" label="📌 Locate" onPress={() => showInFinder($, '')} />
+            {!naming && (
+              <Button
+                key="new-folder"
+                label={narrow ? '📁 New' : '📁 New folder'}
+                onPress={() => update($, isNamingFolder, () => true)}
+              />
+            )}
           </Box>
-          {/* Real buttons, as Files and Folder in the row above: Open and Locate
-              show the folder, New folder and Shot make something new in it. */}
-          <Button key="open-target" label="↗️ Open" onPress={() => openWithDefaultApp($, '')} />
-          <Button key="finder-target" label="📌 Locate" onPress={() => showInFinder($, '')} />
-          {!naming && (
-            <Button
-              key="new-folder"
-              label={narrow ? '📁 New' : '📁 New folder'}
-              onPress={() => update($, isNamingFolder, () => true)}
-            />
-          )}
-          <Button key="shot" label={narrow ? '📸' : '📸 Shot'} onPress={() => takeShot($, lines)} />
-          <Button key="save-chat" label={narrow ? '💾' : '💾 Chat'} onPress={() => saveSession($)} />
-          {/* A tool: last. */}
-          <Button key="claude-target" label={narrow ? '✴️' : '✴️ Claude'} onPress={() => openClaude($)} />
+        </Box>
+        {/* The tools: what makes something new with or for the target, or opens
+            another app. */}
+        <Box flexDirection="row" alignItems="flex-start" gap={1} marginTop={rowSpace}>
+          <Box width={labelWidth} flexShrink={0}>
+            <Text>{label('🧰', 'Tools')}</Text>
+          </Box>
+          <Box flexDirection="row" gap={1} alignItems="center" flexGrow={1} flexShrink={1} flexWrap={lines ? undefined : 'wrap'} rowGap={rowSpace}>
+            {withTip(
+              'shot',
+              narrow ? 'Take a screenshot into the target' : null,
+              <Button key="shot" label={narrow ? '📸' : '📸 Shot'} onPress={() => takeShot($, lines)} />,
+            )}
+            {withTip(
+              'save-chat',
+              narrow ? 'Save this chat as Markdown' : null,
+              <Button key="save-chat" label={narrow ? '💾' : '💾 Chat'} onPress={() => saveSession($)} />,
+            )}
+            {withTip(
+              'claude-target',
+              narrow ? 'Open Claude Code in Terminal here' : null,
+              <Button key="claude-target" label={narrow ? '✴️' : '✴️ Claude'} onPress={() => openClaude($)} />,
+            )}
+            {withTip(
+              'calendar',
+              narrow ? 'Open Calendar' : null,
+              <Button key="calendar" label={narrow ? '📅' : '📅 Calendar'} onPress={() => openApp($, 'Calendar')} />,
+            )}
+            {withTip(
+              'calculator',
+              narrow ? 'Open Calculator' : null,
+              <Button key="calculator" label={narrow ? '🧮' : '🧮 Calculator'} onPress={() => openApp($, 'Calculator')} />,
+            )}
+          </Box>
         </Box>
         {/* The target's content, filtered: the row's label is the filter's. */}
-        <Box flexDirection="row" gap={1} marginTop={rowSpace}>
+        <Box flexDirection="row" alignItems="flex-start" gap={1} marginTop={rowSpace}>
           <Box width={labelWidth} flexShrink={0}>
             <Text>{label('🏷️', 'Filter')}</Text>
           </Box>
-          {/* The terminal draws the field as wide as its box; the desktop at its
-              own width, so a fixed box there would push Clear away. */}
-          <Box width={lines ? (narrow ? 24 : 38) : undefined}>
-            <Input
-              key={`filter-${await read($, filterId)}`}
-              placeholder="Name (↵ recursive)"
-              submitLabel="🔍 Find"
-              onInput={(value: string) => filterBy($, value)}
-              onSubmit={(value: string) => runSearch($, value)}
-            />
-          </Box>
-          {filterText !== '' && (
-            <Button key="clear-filter" label="🧹 Clear" plain dimColor onPress={() => clearFilter($)} />
-          )}
-          {/* Files or an image from the clipboard into the target's content. */}
-          <Box key="tip:paste-files">
-            <Button
-              key="paste-files"
-              label={narrow ? '📋' : '📋 Paste'}
-              onPress={() => pasteFromClipboard($)}
-            />
-            {tipsOn && (
-              <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-                <Text inverse>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
-              </Box>
+          {/* The row's buttons: on the desktop they wrap to a next line, which
+              starts under the first of them, not under the label. */}
+          <Box flexDirection="row" gap={1} alignItems="center" flexGrow={1} flexShrink={1} flexWrap={lines ? undefined : 'wrap'} rowGap={rowSpace}>
+            {/* The terminal draws the field as wide as its box; the desktop at its
+                own width, so a fixed box there would push Clear away. */}
+            <Box width={lines ? (narrow ? 24 : 38) : undefined}>
+              <Input
+                key={`filter-${await read($, filterId)}`}
+                placeholder="Name (↵ recursive)"
+                submitLabel="🔍 Find"
+                onInput={(value: string) => filterBy($, value)}
+                onSubmit={(value: string) => runSearch($, value)}
+              />
+            </Box>
+            {filterText !== '' && (
+              <Button key="clear-filter" label="🧹 Clear" plain dimColor onPress={() => clearFilter($)} />
             )}
-          </Box>
-          {/* The view: after the filter, used less often. */}
-          <Button
-            key="refresh"
-            label={narrow ? '♻️' : '♻️ Refresh'}
-            plain
-            onPress={() => refreshList($)}
-          />
-          <Button
-            key="list"
-            label={narrow ? (listOpen ? '🫣' : '👁️') : listOpen ? '🫣 Hide' : '👁️ Show'}
-            plain
-            onPress={() => toggleList($)}
-          />
-          <Button
-            key="dotfiles"
-            label={narrow ? '👻 .files' : showDots ? '👻 Hide .files' : '👻 Show .files'}
-            plain
-            dimColor={!showDots}
-            onPress={() => toggleDotfiles($)}
-          />
-          {listOpen && pageCount > 1 && (
-            <Box flexDirection="row" gap={1}>
-              {shownPage > 0 && (
-                <Button
-                  key="page-prev"
-                  label="◀"
-                  plain
-                  onPress={() => update($, page, () => shownPage - 1)}
-                />
-              )}
-              <Text dimColor>{`${shownPage + 1}/${pageCount} (#${view.length})`}</Text>
-              {shownPage < pageCount - 1 && (
-                <Button
-                  key="page-next"
-                  label="▶"
-                  plain
-                  onPress={() => update($, page, () => shownPage + 1)}
-                />
+            {/* Files or an image from the clipboard into the target's content. */}
+            <Box key="tip:paste-files">
+              <Button
+                key="paste-files"
+                label={narrow ? '📋' : '📋 Paste'}
+                onPress={() => pasteFromClipboard($)}
+              />
+              {tipsOn && (
+                <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
+                  <Text inverse>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
+                </Box>
               )}
             </Box>
-          )}
+            {/* The view: after the filter, used less often. */}
+            {withTip(
+              'refresh',
+              narrow ? 'Read the list again' : null,
+              <Button
+                key="refresh"
+                label={narrow ? '♻️' : '♻️ Refresh'}
+                plain
+                onPress={() => refreshList($)}
+              />,
+            )}
+            {withTip(
+              'list',
+              narrow ? (listOpen ? 'Hide the list' : 'Show the list') : null,
+              <Button
+                key="list"
+                label={narrow ? (listOpen ? '🫣' : '👁️') : listOpen ? '🫣 Hide' : '👁️ Show'}
+                plain
+                onPress={() => toggleList($)}
+              />,
+            )}
+            <Button
+              key="dotfiles"
+              label={narrow ? '👻 .files' : showDots ? '👻 Hide .files' : '👻 Show .files'}
+              plain
+              dimColor={!showDots}
+              onPress={() => toggleDotfiles($)}
+            />
+          </Box>
         </Box>
         {naming && (
           <Box flexDirection="row" gap={1}>
@@ -1912,12 +2053,12 @@ export const register: Register = (on, options) => {
                 <Box
                   key="table"
                   flexDirection="column"
-                  width={tableWidth}
+                  width={lines ? tableWidth : '100%'}
                   borderStyle="single"
                   borderDimColor
                 >
-                  <Box key="table-head" flexDirection="row">
-                    <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
+                  <Box key="table-head" flexDirection="row" {...tableRow}>
+                    <Box flexShrink={0} width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
                       <Button
                         key="tick-all"
                         label={tick(view.every(n => ticked.includes(n)))}
@@ -1926,7 +2067,7 @@ export const register: Register = (on, options) => {
                       />
                     </Box>
                     {columnLine()}
-                    <Box width={nameWidth + 2} paddingX={1}>
+                    <Box {...nameCell} paddingX={1}>
                       <Button
                         key="sort-name"
                         label={`Name${arrow('name')}`}
@@ -1936,7 +2077,7 @@ export const register: Register = (on, options) => {
                     </Box>
                     {showFolder && columnLine()}
                     {showFolder && (
-                      <Box width={folderWidth + 2} paddingX={1}>
+                      <Box flexShrink={0} width={folderWidth + 2} paddingX={1}>
                         <Button
                           key="sort-folder"
                           label={`Folder${arrow('folder')}`}
@@ -1946,7 +2087,7 @@ export const register: Register = (on, options) => {
                       </Box>
                     )}
                     {columnLine()}
-                    <Box width={SIZE_WIDTH + 2} paddingX={1}>
+                    <Box flexShrink={0} width={SIZE_WIDTH + 2} paddingX={1}>
                       <Button
                         key="sort-size"
                         label={`Size${arrow('size')}`}
@@ -1955,13 +2096,35 @@ export const register: Register = (on, options) => {
                       />
                     </Box>
                     {columnLine()}
-                    <Box width={ACTIONS_WIDTH + 2} paddingX={1}>
-                      <Text>Actions</Text>
+                    {/* The header's actions: the rows' buttons, so the column is as
+                        wide here as in every row (the desktop sizes it by its
+                        buttons); they act on the ticked items, bright while
+                        there are any. */}
+                    <Box
+                      flexShrink={0}
+                      width={lines ? actionsWidth + 2 : undefined}
+                      paddingX={1}
+                      flexDirection="row"
+                      gap={lines ? 1 : 0}
+                    >
+                      {ACTIONS.map(([id, icon, word, , headerTip]) =>
+                        withTip(
+                          `${id}-selected`,
+                          headerTip,
+                          <Button
+                            key={`${id}-selected`}
+                            label={iconOnly ? icon : `${icon} ${word}`}
+                            plain
+                            dimColor={ticked.length === 0}
+                            onPress={() => runAction($, id, ticked, true)}
+                          />,
+                        ),
+                      )}
                     </Box>
                   </Box>
                   {lines ? (
                     <Text key="table-line" dimColor>
-                      {[tickWidth, nameWidth, ...(showFolder ? [folderWidth] : []), SIZE_WIDTH, ACTIONS_WIDTH]
+                      {[tickWidth, nameWidth, ...(showFolder ? [folderWidth] : []), SIZE_WIDTH, actionsWidth]
                         .map(width => '─'.repeat(width + 2))
                         .join('┼')}
                     </Text>
@@ -2003,12 +2166,13 @@ export const register: Register = (on, options) => {
                       <Box
                         key={`row:${name}`}
                         flexDirection="row"
+                        {...tableRow}
                         backgroundColor={
                           index % 2 === 1 ? (lines ? ROW_STRIPE : DESKTOP_STRIPE) : undefined
                         }
                         hover={lines ? undefined : { backgroundColor: DESKTOP_HOVER }}
                       >
-                        <Box width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
+                        <Box flexShrink={0} width={lines ? tickWidth + 2 : tickWidth} paddingX={lines ? 1 : 0}>
                           <Button
                             key={`tick:${name}`}
                             label={tick(ticked.includes(name))}
@@ -2019,24 +2183,12 @@ export const register: Register = (on, options) => {
                         {columnLine()}
                         {/* A keyed Box is a hover scope: a name cut with "…" shows
                             whole above the row while the pointer is over it. */}
-                        <Box key={`name-cell:${name}`} width={nameWidth + 2} paddingX={1}>
-                          {name.endsWith('/') ? (
-                            <Button
-                              key={`dir:${name}`}
-                              label={fitName(`📁 ${entryName(name)}`, nameWidth)}
-                              plain
-                              onPress={() =>
-                                openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`)
-                              }
-                            />
-                          ) : (
-                            <Button
-                              key={`file:${name}`}
-                              label={fitName(`📄 ${entryName(name)}`, nameWidth)}
-                              plain
-                              onPress={() => openWithDefaultApp($, name)}
-                            />
-                          )}
+                        <Box key={`name-cell:${name}`} {...nameCell} paddingX={1}>
+                          {name.endsWith('/')
+                            ? nameButton(`dir:${name}`, `📁 ${entryName(name)}`, () =>
+                                openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`),
+                              )
+                            : nameButton(`file:${name}`, `📄 ${entryName(name)}`, () => openWithDefaultApp($, name))}
                           {fitName(`📄 ${entryName(name)}`, nameWidth).endsWith('…') && (
                             <Box position="absolute" top={-1} left={1} display="none" hover={{ display: 'flex' }}>
                               <Text inverse>{` ${entryName(name)} `}</Text>
@@ -2048,7 +2200,7 @@ export const register: Register = (on, options) => {
                           // A keyed Box is a hover scope: the pointer over the cell
                           // reveals the full folder above it, over the row before,
                           // without moving anything.
-                          <Box key={`folder-cell:${name}`} width={folderWidth + 2} paddingX={1}>
+                          <Box flexShrink={0} key={`folder-cell:${name}`} width={folderWidth + 2} paddingX={1}>
                             <Button
                               key={`folder:${name}`}
                               label={fitStart(entryFolder(name) === '' ? '.' : entryFolder(name), folderWidth)}
@@ -2075,7 +2227,7 @@ export const register: Register = (on, options) => {
                           </Box>
                         )}
                         {columnLine()}
-                        <Box width={SIZE_WIDTH + 2} paddingX={1}>
+                        <Box flexShrink={0} width={SIZE_WIDTH + 2} paddingX={1}>
                           {countOf[name] !== undefined && (
                             <Text dimColor>{itemCount(countOf[name][showDots ? 'all' : 'shown'])}</Text>
                           )}
@@ -2087,54 +2239,28 @@ export const register: Register = (on, options) => {
                         {/* The desktop draws each Button with its own padding: no gap
                             needed there. The terminal needs one cell between labels. */}
                         <Box
-                          width={ACTIONS_WIDTH + 2}
+                          // On the desktop as wide as its buttons need: they
+                          // are drawn larger than the terminal's cells count.
+                          width={lines ? actionsWidth + 2 : undefined}
+                          flexShrink={0}
                           paddingX={1}
                           flexDirection="row"
                           gap={lines ? 1 : 0}
                         >
-                          {/* As on the Target row: Open first, Locate last. */}
-                          <Button
-                            key={`open:${name}`}
-                            label="↗️ Open"
-                            plain
-                            dimColor
-                            onPress={() => openWithDefaultApp($, name)}
-                          />
-                          <Button
-                            key={`rename:${name}`}
-                            label="📝 Ren"
-                            plain
-                            dimColor
-                            onPress={() => startRename($, name)}
-                          />
-                          <Button
-                            key={`date:${name}`}
-                            label="📅 Date"
-                            plain
-                            dimColor
-                            onPress={() => startDate($, name)}
-                          />
-                          <Button
-                            key={`mention:${name}`}
-                            label="💬 Ask"
-                            plain
-                            dimColor
-                            onPress={() => mention($, [name])}
-                          />
-                          <Button
-                            key={`copy:${name}`}
-                            label="📋 Copy"
-                            plain
-                            dimColor
-                            onPress={() => copyToClipboard($, [name])}
-                          />
-                          <Button
-                            key={`show:${name}`}
-                            label="📌 Locate"
-                            plain
-                            dimColor
-                            onPress={() => showInFinder($, name)}
-                          />
+                          {ACTIONS.map(([id, icon, word, tip]) =>
+                            withTip(
+                              `${id}:${name}`,
+                              iconOnly ? tip : null,
+                              <Button
+                                key={`${id}:${name}`}
+                                label={iconOnly ? icon : `${icon} ${word}`}
+                                plain
+                                dimColor
+                                onPress={() => runAction($, id, [name], false)}
+                              />,
+                              -1,
+                            ),
+                          )}
                         </Box>
                       </Box>
                     ),
@@ -2143,17 +2269,43 @@ export const register: Register = (on, options) => {
               )}
               {searching && <Text dimColor>Searching...</Text>}
               {note !== null && <Text color="yellow">{`⚠ ${note}`}</Text>}
-              {ticked.length > 0 && !confirming && !confirmingDate && (
-                <Box flexDirection="row" gap={1} alignItems="center">
-                  <Text dimColor>{`${ticked.length} selected:`}</Text>
-                  <Button
-                    key="delete-selected"
-                    label="❌ Delete"
-                    onPress={() => update($, isConfirming, () => true)}
-                  />
-                  <Button key="date-selected" label="📅 Date" onPress={() => update($, isConfirmingDate, () => true)} />
-                  <Button key="mention-selected" label="💬 Ask" onPress={() => mention($, ticked)} />
-                  <Button key="copy-selected" label="📋 Copy" onPress={() => copyToClipboard($, ticked)} />
+              {/* Under the table: the ticked items' Delete at the left, the page
+                  control at the right. */}
+              {((ticked.length > 0 && !confirming && !confirmingDate) || pageCount > 1) && (
+                <Box flexDirection="row" gap={1} alignItems="center" justifyContent="space-between">
+                  {ticked.length > 0 && !confirming && !confirmingDate ? (
+                    <Box flexDirection="row" gap={1} alignItems="center">
+                      <Text dimColor>{`${ticked.length} selected:`}</Text>
+                      <Button
+                        key="delete-selected"
+                        label="❌ Delete"
+                        onPress={() => update($, isConfirming, () => true)}
+                      />
+                    </Box>
+                  ) : (
+                    <Box />
+                  )}
+                  {listOpen && pageCount > 1 && (
+                    <Box flexDirection="row" gap={1}>
+                      {shownPage > 0 && (
+                        <Button
+                          key="page-prev"
+                          label="◀"
+                          plain
+                          onPress={() => update($, page, () => shownPage - 1)}
+                        />
+                      )}
+                      <Text dimColor>{`${shownPage + 1}/${pageCount} (#${view.length})`}</Text>
+                      {shownPage < pageCount - 1 && (
+                        <Button
+                          key="page-next"
+                          label="▶"
+                          plain
+                          onPress={() => update($, page, () => shownPage + 1)}
+                        />
+                      )}
+                    </Box>
+                  )}
                 </Box>
               )}
               {/* The question and its buttons on one line. */}
@@ -2226,13 +2378,17 @@ export const register: Register = (on, options) => {
               padding alone keeps them apart, as wide as the row's gap. */}
           <Box flexDirection="row" gap={lines ? 1 : 0}>
             <Text dimColor>·</Text>
-            <Button
-              key="tips"
-              label={narrow ? (tipsOn ? '✅' : '💤') : tipsOn ? '✅ Tips' : '💤 Tips'}
-              plain
-              dimColor={!tipsOn}
-              onPress={() => toggleTips($)}
-            />
+            {withTip(
+              'tips',
+              narrow ? (tipsOn ? 'Tips are on' : 'Turn tips on') : null,
+              <Button
+                key="tips"
+                label={narrow ? (tipsOn ? '✅' : '💤') : tipsOn ? '✅ Tips' : '💤 Tips'}
+                plain
+                dimColor={!tipsOn}
+                onPress={() => toggleTips($)}
+              />,
+            )}
           </Box>
           {/* Pushes the clock to the right end. */}
           <Box flexGrow={1} />
@@ -2240,9 +2396,8 @@ export const register: Register = (on, options) => {
             // Never wrapped or cut: the clock and the version keep their room;
             // the tip wraps instead.
             <Box flexShrink={0} flexDirection="row" gap={lines ? 1 : 0}>
-              {/* 📅 opens Calendar; a click on the clock puts the date and time
-                  on the clipboard as the start of a file name. */}
-              {clock !== null && <Button key="calendar" label="📅" plain onPress={() => openCalendar($)} />}
+              {/* A click on the clock puts the date and time on the clipboard
+                  as the start of a file name. */}
               {clock !== null && (
                 <Button
                   key="clock"
