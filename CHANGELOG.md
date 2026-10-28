@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.26.0
+
+- New row **🧰 Tools** after 🎯 Target: 📸 Shot, 💾 Chat, ✴️ Claude, **📅 Calendar** (moved from the clock) and the new **🧮 Calculator**. 🎯 Target keeps the path, Open, Locate and New folder.
+- The table header shows the six actions instead of the word "Actions". They act on the ticked items (Ren and Locate on one), so the row under the table keeps only ❌ Delete.
+- The page control sits under the table, at the right.
+- Below 100 columns the table actions show their icons alone, on both surfaces.
+- Every button that shows only its icon has a tip while ✅ Tips is on.
+- Desktop: fixes for the larger buttons of Claude Code 2.1.309. More space between the rows, rows that wrap instead of being cut off, table rows as high as their buttons, column lines through every row, and a Name column that takes the free room and cuts itself with "…".
+- README: new screenshots.
+
 ## 1.25.0
 
 - New button **💾 Chat** on the 🎯 Target row: one click saves the conversation as Markdown in the target, named like a screenshot (`2026-10-24_101530 - Session.md`). Each message is under "👤 You" or "🤖 Claude"; each tool call is one short line, without its output.
