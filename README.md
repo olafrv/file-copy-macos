@@ -102,6 +102,7 @@ The rows of the bar are 📎 Source, 🎯 Target, 🧰 Tools, 🏷️ Filter (th
 - **🧲 Downloads** copies the newest file or folder in `~/Downloads`. Downloads still in progress are skipped.
 - Before you press Enter, the list under the field shows each pasted item. Click an item to remove it. Its path is also removed from the field.
 - Folders are copied with all their contents.
+- After a copy, one line above the 💡 Finder row shows the result: **✅ Copied:** the new names, with **❌ Delete** (moves them to the Trash, after a question) and **🫣 Hide**. Skipped and failed items show on the same line.
 
 ### Name conflicts
 

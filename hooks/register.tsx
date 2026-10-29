@@ -1601,7 +1601,7 @@ export const register: Register = (on, options) => {
     // folder field; the table's frame, header and header line
     // (terminal); a search's note and "Searching..."; the selection row (kept
     // free, so ticking does not change the page); the Finder row, which may
-    // wrap; the copy result or the overwrite question; and on the desktop the
+    // wrap; the overwrite question; and on the desktop the
     // small gaps between the rows with buttons.
     const isTerminal = e.surface === 'terminal'
     const otherRows =
@@ -1618,8 +1618,9 @@ export const register: Register = (on, options) => {
       (searching ? 1 : 0) +
       (confirming ? 2 : 1) +
       2 +
-      (result !== null && !hidden && !isBusy && ask === null ? 3 : 0) +
-      (ask !== null ? 2 : 0) +
+      (ask !== null ? (isTerminal ? 2 : 3) : 0) +
+      // The copy result's line, on the desktop with a space line.
+      (result !== null && !hidden && !isBusy && ask === null ? (isTerminal ? 1 : 2) : 0) +
       (isTerminal ? 0 : 1)
     const pageSize = pageSizeFor(e.props.maxRows, otherRows)
     // A page past the end (after a delete) shows the last page.
@@ -1728,13 +1729,6 @@ export const register: Register = (on, options) => {
     // In the terminal's Name header: what "Name ▲" and the gap leave.
     const headUpLabel = fitName(upLabel, nameWidth - `Name${arrow('name')}`.length - 1)
     const showResult = result !== null && !hidden && !isBusy && ask === null
-    // The Hide button sits on the last result line drawn.
-    const hideOn =
-      result === null || result.failed.length > 0
-        ? 'failed'
-        : result.skipped.length > 0
-          ? 'skipped'
-          : 'copied'
     const text = await read($, draft)
     const paths = parsePaths(text)
     const dirs = await read($, pastedDirs)
@@ -2346,14 +2340,81 @@ export const register: Register = (on, options) => {
             </Box>
           </Box>
         )}
+        {/* After a copy, its result on one line, as "1 selected: ❌ Delete":
+            the names, then Delete or its question, and Hide. */}
+        {showResult && (
+          <Box
+            flexDirection="row"
+            gap={1}
+            alignItems="center"
+            marginTop={rowSpace && listOpen && ticked.length > 0 ? rowSpace : 0}
+          >
+            {result.copied.length > 0 && <Text color="green">{label('✅', 'Copied')}</Text>}
+            {result.copied.length > 0 && (
+              <Box flexShrink={1}>
+                <Text wrap="truncate-end">{result.copied.join(', ')}</Text>
+              </Box>
+            )}
+            {result.copied.length > 0 && !confirmingLast && (
+              <Button
+                key="trash"
+                label="❌ Delete"
+                onPress={() => update($, isConfirmingLast, () => true)}
+              />
+            )}
+            {/* The question and its buttons on one line, as for the ticked items. */}
+            {result.copied.length > 0 && confirmingLast && (
+              <Text color="yellow">
+                {result.copied.length === 1
+                  ? 'Delete the copied file?'
+                  : `Delete the ${result.copied.length} copied files?`}
+              </Text>
+            )}
+            {result.copied.length > 0 && confirmingLast && (
+              <Button
+                key="confirm-trash"
+                label="❌ Delete"
+                onPress={async () => {
+                  await update($, isConfirmingLast, () => false)
+                  await trashLastCopy($, result)
+                }}
+              />
+            )}
+            {result.copied.length > 0 && confirmingLast && (
+              <Button
+                key="cancel-trash"
+                label="⏹️ Cancel"
+                plain
+                onPress={() => update($, isConfirmingLast, () => false)}
+              />
+            )}
+            {result.skipped.length > 0 && <Text dimColor>{label('⏭️', 'Skipped')}</Text>}
+            {result.skipped.length > 0 && (
+              <Box flexShrink={1}>
+                <Text dimColor wrap="truncate-end">{result.skipped.join(', ')}</Text>
+              </Box>
+            )}
+            {result.failed.length > 0 && <Text color="yellow">{label('⚠', 'Failed')}</Text>}
+            {result.failed.length > 0 && (
+              <Box flexShrink={1}>
+                <Text wrap="truncate-end">{result.failed.join(', ')}</Text>
+              </Box>
+            )}
+            {!confirmingLast && (
+              <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
+            )}
+          </Box>
+        )}
+        {/* A keyed Box: with tips on, pointing at the short tip explains it. */}
         {/* On the desktop, a space line above it when buttons end the part
-            above (the Filter row, ⤴️, Delete or a question); the table's frame
+            above (the Filter row, ⤴️, Delete, a copy result or a question); the table's frame
             keeps them apart otherwise. */}
         <Box
           flexDirection="row"
           gap={1}
+          alignItems="center"
           marginTop={
-            !listOpen || view.length === 0 || ticked.length > 0 || confirming || confirmingDate
+            !listOpen || view.length === 0 || ticked.length > 0 || confirming || confirmingDate || showResult
               ? rowSpace
               : 0
           }
@@ -2384,7 +2445,6 @@ export const register: Register = (on, options) => {
               <Text dimColor>·</Text>
             </Box>
           )}
-          {/* A keyed Box: with tips on, pointing at the short tip explains it. */}
           <Box key="tip:finder-tip" flexShrink={1}>
             <Text dimColor wrap="wrap">
               {e.surface === 'terminal'
@@ -2448,8 +2508,9 @@ export const register: Register = (on, options) => {
             </Box>
           )}
         </Box>
+        {/* On the desktop a space line above it, as between the rows above. */}
         {ask !== null && (
-          <Box flexDirection="row" gap={1}>
+          <Box flexDirection="row" gap={1} marginTop={rowSpace}>
             <Box width={labelWidth} flexShrink={0}>
               <Text color="yellow">{label('⚠', 'Exists')}</Text>
             </Box>
@@ -2464,79 +2525,6 @@ export const register: Register = (on, options) => {
                 <Button key="cancel" label="⏹️ Cancel" plain onPress={() => answer($, ask, null)} />
               </Box>
             </Box>
-          </Box>
-        )}
-        {showResult && result.copied.length > 0 && (
-          <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={labelWidth} flexShrink={0}>
-              <Text color="green">{label('✅', 'Copied')}</Text>
-            </Box>
-            <Box flexGrow={1} flexShrink={1}>
-              <Text wrap="wrap">{result.copied.join(', ')}</Text>
-            </Box>
-            {!confirmingLast && (
-              <Button
-                key="trash"
-                label="❌ Delete"
-                onPress={() => update($, isConfirmingLast, () => true)}
-              />
-            )}
-            {!confirmingLast && hideOn === 'copied' && (
-              <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
-            )}
-          </Box>
-        )}
-        {showResult && confirmingLast && result.copied.length > 0 && (
-          <Box flexDirection="row" gap={1}>
-            <Box width={labelWidth} flexShrink={0} />
-            <Box flexDirection="column" flexGrow={1}>
-              <Text color="yellow">
-                {result.copied.length === 1
-                  ? 'Delete the copied file?'
-                  : `Delete the ${result.copied.length} copied files?`}
-              </Text>
-              <Box flexDirection="row" gap={1}>
-                <Button
-                  key="confirm-trash"
-                  label="❌ Delete"
-                  onPress={async () => {
-                    await update($, isConfirmingLast, () => false)
-                    await trashLastCopy($, result)
-                  }}
-                />
-                <Button
-                  key="cancel-trash"
-                  label="⏹️ Cancel"
-                  onPress={() => update($, isConfirmingLast, () => false)}
-                />
-              </Box>
-            </Box>
-          </Box>
-        )}
-        {showResult && result.skipped.length > 0 && (
-          <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={labelWidth} flexShrink={0}>
-              <Text dimColor>{label('⏭️', 'Skipped')}</Text>
-            </Box>
-            <Box flexGrow={1} flexShrink={1}>
-              <Text dimColor wrap="wrap">{result.skipped.join(', ')}</Text>
-            </Box>
-            {!confirmingLast && hideOn === 'skipped' && (
-              <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
-            )}
-          </Box>
-        )}
-        {showResult && result.failed.length > 0 && (
-          <Box flexDirection="row" gap={1} alignItems="center">
-            <Box width={labelWidth} flexShrink={0}>
-              <Text color="yellow">{label('⚠', 'Failed')}</Text>
-            </Box>
-            <Box flexGrow={1} flexShrink={1}>
-              <Text wrap="wrap">{result.failed.join(', ')}</Text>
-            </Box>
-            {!confirmingLast && (
-              <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
-            )}
           </Box>
         )}
       </Box>
