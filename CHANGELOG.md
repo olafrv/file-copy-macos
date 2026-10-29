@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.27.1
+
+- The copy result ("✅ Copied: … ❌ Delete 🫣 Hide") has the same look as "1 selected: ❌ Delete": one line under the table, with its question "Delete the copied file?" and the buttons on the same line, and ⏹️ Cancel without a frame.
+- Desktop: the copy result, the overwrite question and the 💡 Finder row no longer overlap. The page size keeps room for them, so the bar does not scroll.
+- README: new screenshots.
+
 ## 1.27.0
 
 - ⤴️ (one folder up) sits next to the Name header instead of on its own line. In an empty folder it keeps its own line.
