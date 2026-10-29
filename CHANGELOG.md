@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.27.0
+
+- ⤴️ (one folder up) sits next to the Name header instead of on its own line. In an empty folder it keeps its own line.
+- The page control moved to the start of the 💡 Finder row and shows "2/3 (9)" without "#".
+- A page shows 2 to 10 items (before: 4 to 10), as many as fit. On the desktop the bar now fits without scrolling.
+- Shorter 💡 Finder tip: `⌥⌘C ⌘V 📎 > 🧲 · ⌘C > 📋`, the same order in every terminal width.
+- Desktop: a space line keeps the 💡 Finder row apart from the buttons above it while the table is hidden.
+
 ## 1.26.0
 
 - New row **🧰 Tools** after 🎯 Target: 📸 Shot, 💾 Chat, ✴️ Claude, **📅 Calendar** (moved from the clock) and the new **🧮 Calculator**. 🎯 Target keeps the path, Open, Locate and New folder.
