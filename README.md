@@ -89,7 +89,7 @@ Listing folders, file sizes, name checks, 🧲 Desktop, 🧲 Downloads, 💾 Cha
 
 ## What it does
 
-The rows of the bar are 📎 Source, 🎯 Target, 🧰 Tools, 🏷️ Filter (the target's content) and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and most buttons show only their icons, to leave room for the fields: 📄 File, 🗂️ Folder, 📋 Paste, ✴️ Claude, 📸 Shot, 💾 Chat, 📅 Calendar, 🧮 Calculator, 🧲🖥️ Desktop, 🧲⬇️ Downloads, ♻️ Refresh, 🫣 Hide, 📁 New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋`.
+The rows of the bar are 📎 Source, 🎯 Target, 🧰 Tools, 🏷️ Filter (the target's content) and 💡 Finder. In a terminal narrower than 100 columns (the standard size is 80×24), the rows and most buttons show only their icons, to leave room for the fields: 📄 File, 🗂️ Folder, 📋 Paste, ✴️ Claude, 📸 Shot, 💾 Chat, 📅 Calendar, 🧮 Calculator, 🧲🖥️ Desktop, 🧲⬇️ Downloads, ♻️ Refresh, 🫣 Hide, 📁 New folder, 👻 .files. The 💡 tip then reads `Drag/⌥⌘C ⌘V 📎 > 🧲 · ⌘C > 📋`.
 
 **💤 Tips** in the 💡 Finder row turns on help tips (it becomes **✅ Tips**). Then point at 📋 Paste, 🧲 Desktop, 🧲 Downloads or the 💡 Finder tip to see what it does, and at every button that shows only its icon. The other buttons say it in their label. Tips are off by default, because the app shows them at once, without a delay. The mod remembers your choice. In the terminal, tips need a terminal that reports mouse movement, which fullscreen mode usually does.
 
@@ -133,10 +133,10 @@ If a name already exists in the target, the mod asks first:
 - The content of the target shows when a session starts; **🫣 Hide** closes it and **👁️ Show** opens it again.
 - Names that start with "." (for example `.env` or `.claude`) are hidden, as in Finder. **👻 Show .files** shows them, in the list and in search results; **👻 Hide .files** hides them again. The mod remembers your choice.
 - The content is a framed table with the columns tick box, Name, Size and the actions. Every other row is striped in a faint gray; on the desktop the row under the pointer also lights up. Long names are cut with "…"; point at one to see it whole. Lines separate the columns and the header. For a folder, Size shows its number of items, as Finder counts them (only the first level, and names starting with "." only while 👻 .files is on): for example `3 items`, `1 item` or `Empty`. Search results show no count.
-- Click a 📁 folder name to open it. It becomes the target. ⤴️ goes up one level. You cannot leave the project.
+- Click a 📁 folder name to open it. It becomes the target. ⤴️ next to the Name header goes up one level. You cannot leave the project.
 - Click a 📄 file name to open it with its default macOS app.
 - Click **Name** or **Size** (and **Folder** during a search) in the header to sort by that column. Click again to change between ascending (▲) and descending (▼). Folders always come first; when sorting by size, they stay in name order.
-- The list shows 4 to 10 items per page: as many as fit, so the bar does not need to scroll. In a larger terminal window you see more items. The desktop app gives the bar less room, so it usually shows 4. Use **◀** and **▶** under the table, at the right, to change the page; "2/3 (#9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
+- The list shows 2 to 10 items per page: as many as fit, so the bar does not need to scroll. In a larger terminal window you see more items. The desktop app gives the bar less room, so it usually shows 2. Use **◀** and **▶** at the start of the 💡 Finder row to change the page; "2/3 (9)" means page 2 of 3, 9 items. Ticked items stay ticked on other pages.
 - Each row has six actions. When the bar is narrower than 100 columns (on the desktop too), they show only their icons, `↗️ 📝 📅 💬 📋 📌`, so the Name column keeps room:
   - **↗️ Open:** opens a file in its default macOS app, a folder in Finder.
   - **📝 Ren:** renames the item.

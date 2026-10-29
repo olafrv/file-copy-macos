@@ -316,7 +316,7 @@ export const fitCrumbs = (
 }
 
 /** The fewest and the most items a page of the file list shows. */
-export const MIN_PAGE_SIZE = 4
+export const MIN_PAGE_SIZE = 2
 export const MAX_PAGE_SIZE = 10
 
 /**

@@ -269,11 +269,11 @@ const ICON_LABEL_WIDTH = 2
 
 // The two ways from Finder: files on the clipboard, or their paths as text.
 // The row's label says "Finder:".
-const FINDER_TIP = '⌥⌘C ⌘V into 📎 > 🧲 Add · ⌘C > 📋 Paste'
+const FINDER_TIP = '⌥⌘C ⌘V 📎 > 🧲 · ⌘C > 📋'
 // The terminal can also take files dragged into the 📎 field.
 const FINDER_TIP_TERMINAL = `Drag or ${FINDER_TIP}`
-// A narrow terminal: the same in icons, so the clock still fits the row.
-const FINDER_TIP_NARROW = 'Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋'
+// A narrow terminal: shorter still, so the clock fits the row.
+const FINDER_TIP_NARROW = `Drag/${FINDER_TIP}`
 // The same in words, shown while the pointer is over the short tip.
 const FINDER_TIP_LONG =
   '⌘ = Command, ⌥ = Option. Copy files in Finder and press 📋 Paste, or copy their ' +
@@ -1598,7 +1598,7 @@ export const register: Register = (on, options) => {
     const arrow = (key: SortKey) => (by === key ? (desc ? ' ▼' : ' ▲') : '')
     // Items per page: what the band's rows leave after its other rows. They
     // are Source with its hint and pasted list; Target; Tools; Content with the New
-    // folder field and ⤴️ up; the table's frame, header and header line
+    // folder field; the table's frame, header and header line
     // (terminal); a search's note and "Searching..."; the selection row (kept
     // free, so ticking does not change the page); the Finder row, which may
     // wrap; the copy result or the overwrite question; and on the desktop the
@@ -1612,7 +1612,6 @@ export const register: Register = (on, options) => {
       1 +
       1 +
       (naming ? 2 : 0) +
-      (dir !== '' ? 1 : 0) +
       3 +
       (isTerminal ? 1 : 0) +
       (note !== null ? 1 : 0) +
@@ -1716,6 +1715,18 @@ export const register: Register = (on, options) => {
       ? ({ width: nameWidth + 2, flexShrink: 0 } as const)
       : ({ flexGrow: 1, flexShrink: 1, minWidth: 0, overflow: 'hidden' } as const)
     const tableWidth = textWidth + frame
+    // ⤴️ and the parent folder's name: one level up.
+    const upLabel = `⤴️ ${parentOf(dir) === '' ? baseName(root) : baseName(parentOf(dir))}/`
+    const upButton = (text: string): RenderElement =>
+      lines ? (
+        <Button key="up" label={text} plain onPress={() => openFolder($, parentOf(dir))} />
+      ) : (
+        <Button key="up" label={text} plain onPress={() => openFolder($, parentOf(dir))}>
+          <Text wrap="truncate-end">{text}</Text>
+        </Button>
+      )
+    // In the terminal's Name header: what "Name ▲" and the gap leave.
+    const headUpLabel = fitName(upLabel, nameWidth - `Name${arrow('name')}`.length - 1)
     const showResult = result !== null && !hidden && !isBusy && ask === null
     // The Hide button sits on the last result line drawn.
     const hideOn =
@@ -2031,14 +2042,9 @@ export const register: Register = (on, options) => {
         {listOpen && (
           <Box flexDirection="row" gap={1}>
             <Box flexDirection="column" flexGrow={1}>
-              {dir !== '' && (
-                <Button
-                  key="up"
-                  label={`⤴️ ${parentOf(dir) === '' ? baseName(root) : baseName(parentOf(dir))}/`}
-                  plain
-                  onPress={() => openFolder($, parentOf(dir))}
-                />
-              )}
+              {/* Without a table, ⤴️ has its own line; with one, it sits in the
+                  Name header. */}
+              {dir !== '' && view.length === 0 && upButton(upLabel)}
               {names.length === 0 && !searching && (
                 <Text dimColor>
                   {showFolder
@@ -2067,13 +2073,28 @@ export const register: Register = (on, options) => {
                       />
                     </Box>
                     {columnLine()}
-                    <Box {...nameCell} paddingX={1}>
-                      <Button
-                        key="sort-name"
-                        label={`Name${arrow('name')}`}
-                        plain
-                        onPress={() => sortOn($, 'name')}
-                      />
+                    {/* ⤴️ goes up one level, next to Name: no line of its own. */}
+                    <Box {...nameCell} paddingX={1} flexDirection="row" gap={1} alignItems="center">
+                      <Box flexShrink={0}>
+                        <Button
+                          key="sort-name"
+                          label={`Name${arrow('name')}`}
+                          plain
+                          onPress={() => sortOn($, 'name')}
+                        />
+                      </Box>
+                      {dir !== '' && (
+                        <Box flexShrink={1} minWidth={0} overflow="hidden">
+                          {lines
+                            ? withTip(
+                                'up',
+                                headUpLabel === upLabel ? null : upLabel,
+                                upButton(headUpLabel),
+                                -1,
+                              )
+                            : upButton(upLabel)}
+                        </Box>
+                      )}
                     </Box>
                     {showFolder && columnLine()}
                     {showFolder && (
@@ -2269,43 +2290,15 @@ export const register: Register = (on, options) => {
               )}
               {searching && <Text dimColor>Searching...</Text>}
               {note !== null && <Text color="yellow">{`⚠ ${note}`}</Text>}
-              {/* Under the table: the ticked items' Delete at the left, the page
-                  control at the right. */}
-              {((ticked.length > 0 && !confirming && !confirmingDate) || pageCount > 1) && (
-                <Box flexDirection="row" gap={1} alignItems="center" justifyContent="space-between">
-                  {ticked.length > 0 && !confirming && !confirmingDate ? (
-                    <Box flexDirection="row" gap={1} alignItems="center">
-                      <Text dimColor>{`${ticked.length} selected:`}</Text>
-                      <Button
-                        key="delete-selected"
-                        label="❌ Delete"
-                        onPress={() => update($, isConfirming, () => true)}
-                      />
-                    </Box>
-                  ) : (
-                    <Box />
-                  )}
-                  {listOpen && pageCount > 1 && (
-                    <Box flexDirection="row" gap={1}>
-                      {shownPage > 0 && (
-                        <Button
-                          key="page-prev"
-                          label="◀"
-                          plain
-                          onPress={() => update($, page, () => shownPage - 1)}
-                        />
-                      )}
-                      <Text dimColor>{`${shownPage + 1}/${pageCount} (#${view.length})`}</Text>
-                      {shownPage < pageCount - 1 && (
-                        <Button
-                          key="page-next"
-                          label="▶"
-                          plain
-                          onPress={() => update($, page, () => shownPage + 1)}
-                        />
-                      )}
-                    </Box>
-                  )}
+              {/* Under the table: the ticked items' Delete. */}
+              {ticked.length > 0 && !confirming && !confirmingDate && (
+                <Box flexDirection="row" gap={1} alignItems="center">
+                  <Text dimColor>{`${ticked.length} selected:`}</Text>
+                  <Button
+                    key="delete-selected"
+                    label="❌ Delete"
+                    onPress={() => update($, isConfirming, () => true)}
+                  />
                 </Box>
               )}
               {/* The question and its buttons on one line. */}
@@ -2353,10 +2346,44 @@ export const register: Register = (on, options) => {
             </Box>
           </Box>
         )}
-        <Box flexDirection="row" gap={1}>
+        {/* On the desktop, a space line above it when buttons end the part
+            above (the Filter row, ⤴️, Delete or a question); the table's frame
+            keeps them apart otherwise. */}
+        <Box
+          flexDirection="row"
+          gap={1}
+          marginTop={
+            !listOpen || view.length === 0 || ticked.length > 0 || confirming || confirmingDate
+              ? rowSpace
+              : 0
+          }
+        >
           <Box width={labelWidth} flexShrink={0}>
             <Text>{label('💡', 'Finder')}</Text>
           </Box>
+          {/* The page control first: right under the table, at its left. */}
+          {listOpen && pageCount > 1 && (
+            <Box flexShrink={0} flexDirection="row" gap={1}>
+              {shownPage > 0 && (
+                <Button
+                  key="page-prev"
+                  label="◀"
+                  plain
+                  onPress={() => update($, page, () => shownPage - 1)}
+                />
+              )}
+              <Text dimColor>{`${shownPage + 1}/${pageCount} (${view.length})`}</Text>
+              {shownPage < pageCount - 1 && (
+                <Button
+                  key="page-next"
+                  label="▶"
+                  plain
+                  onPress={() => update($, page, () => shownPage + 1)}
+                />
+              )}
+              <Text dimColor>·</Text>
+            </Box>
+          )}
           {/* A keyed Box: with tips on, pointing at the short tip explains it. */}
           <Box key="tip:finder-tip" flexShrink={1}>
             <Text dimColor wrap="wrap">

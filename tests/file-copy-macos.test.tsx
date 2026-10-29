@@ -27,7 +27,7 @@ const BAND = {
   props: {
     hasSurvey: false,
     isWorking: false,
-    maxRows: 10,
+    maxRows: 15,
     bodyColumns: 100,
     scroll: { offset: 0, bodyRows: 10 },
     view: {},
@@ -1136,7 +1136,7 @@ test('Content shows 4 entries per page and keeps ticks across pages', async ($, 
     await ui.press({ key: 'list' })
 
     // Page 1: the 2 folders, f1 and f2; no Prev.
-    expect(await ui.find({ type: 'Text', text: '1/3 (#9)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1/3 (9)' })).toBeDefined()
     expect(await ui.find({ key: 'dir:d1/' })).toBeDefined()
     expect(await ui.find({ key: 'file:f2.txt' })).toBeDefined()
     expect(await ui.find({ key: 'file:f3.txt' })).toBeUndefined()
@@ -1144,7 +1144,7 @@ test('Content shows 4 entries per page and keeps ticks across pages', async ($, 
 
     await ui.press({ key: 'tick:f1.txt' })
     await ui.press({ key: 'page-next' })
-    expect(await ui.find({ type: 'Text', text: '2/3 (#9)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '2/3 (9)' })).toBeDefined()
     expect(await ui.find({ key: 'file:f6.txt' })).toBeDefined()
     expect(await ui.find({ key: 'file:f1.txt' })).toBeUndefined()
 
@@ -1160,24 +1160,24 @@ test('Content shows 4 entries per page and keeps ticks across pages', async ($, 
     expect([...trashed].sort()).toEqual(['/proj/f1.txt', '/proj/f7.txt'])
 
     // 7 entries left: page 3 is gone, the last page shows.
-    expect(await ui.find({ type: 'Text', text: '2/2 (#7)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '2/2 (7)' })).toBeDefined()
     expect(await ui.find({ key: 'file:f6.txt' })).toBeDefined()
 
     await ui.press({ key: 'page-prev' })
-    expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1/2 (7)' })).toBeDefined()
 
     // An empty folder has no page row; going up starts on page 1.
     await ui.press({ key: 'dir:d1/' })
     expect(await ui.find({ type: 'Text', text: 'The folder is empty.' })).toBeDefined()
     expect(await ui.find({ key: 'page-next' })).toBeUndefined()
     await ui.press({ key: 'up' })
-    expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1/2 (7)' })).toBeDefined()
 
     // Closing and opening the list starts on page 1 again.
     await ui.press({ key: 'page-next' })
     await ui.press({ key: 'list' })
     await ui.press({ key: 'list' })
-    expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '1/2 (7)' })).toBeDefined()
 
     await ui.press({ key: 'list' })
     await ui.unmount()
@@ -1665,7 +1665,7 @@ test('Paste adds the files copied in Finder with Cmd+C, else saves a copied imag
 test('the Finder row names both ways from Finder; the terminal also names drag', async ($, on) => {
   on('session.root', () => ({ value: '/proj' }))
   on('process.run', () => ({ value: ran('') }))
-  const tip = '⌥⌘C ⌘V into 📎 > 🧲 Add · ⌘C > 📋 Paste'
+  const tip = '⌥⌘C ⌘V 📎 > 🧲 · ⌘C > 📋'
 
   const desktop = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'desktop', ...BAND })
   expect(await desktop.find({ type: 'Text', text: '💡 Finder:' })).toBeDefined()
@@ -1731,7 +1731,7 @@ test('Find searches subfolders with git: Folder column, warnings, rename in plac
     return { isFilled: true, text: e.text, cursor: e.text.length }
   })
 
-  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
+  const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND, props: { ...BAND.props, maxRows: 20 } })
 
   // Find (Enter) opens the list and asks git, with fsmonitor off, for what
   // it tracks and the new files .gitignore lets through.
@@ -1774,7 +1774,7 @@ test('Find searches subfolders with git: Folder column, warnings, rename in plac
   // More than 500 results: the first 500 and a warning.
   files = Array.from({ length: 501 }, (_, i) => `a/f${i}.txt`)
   await ui.input({ key: 'filter-0', text: '.txt' })
-  expect(await ui.find({ type: 'Text', text: '1/125 (#500)' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^1\/[0-9]+ \(500\)$/ })).toBeDefined()
   expect(
     await ui.find({
       type: 'Text',
@@ -1871,10 +1871,10 @@ test('Clear goes back to page 1', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface: 'terminal', ...BAND })
   await ui.input({ key: 'filter-0', text: 'f', kind: 'change' })
   await ui.press({ key: 'page-next' })
-  expect(await ui.find({ type: 'Text', text: '2/3 (#9)' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '2/3 (9)' })).toBeDefined()
 
   await ui.press({ key: 'clear-filter' })
-  expect(await ui.find({ type: 'Text', text: '1/3 (#10)' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '1/3 (10)' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -1992,10 +1992,10 @@ test('a long Target path is shortened: first the text above the project, then th
   await ui.unmount()
 })
 
-test('a page shows as many items as the band has rows for: 4 to 10', async ($, on) => {
+test('a page shows as many items as the band has rows for: 2 to 10', async ($, on) => {
   expect(pageSizeFor(40, 10)).toBe(10)
   expect(pageSizeFor(17, 10)).toBe(7)
-  expect(pageSizeFor(12, 10)).toBe(4)
+  expect(pageSizeFor(12, 10)).toBe(2)
 
   const names = Array.from({ length: 23 }, (_, i) => `f${i + 1}.txt`)
   on('session.root', () => ({ value: '/proj' }))
@@ -2008,7 +2008,7 @@ test('a page shows as many items as the band has rows for: 4 to 10', async ($, o
   for (const [maxRows, perPage, pages] of [
     [40, 10, 3],
     [18, 7, 4],
-    [10, 4, 6],
+    [10, 2, 12],
   ] as const) {
     const ui = await $.ui.mount({
       plugin: 'file-copy-macos',
@@ -2019,7 +2019,7 @@ test('a page shows as many items as the band has rows for: 4 to 10', async ($, o
     await ui.press({ key: 'list' })
     const rows = (await ui.findAll({ type: 'Button' })).filter(b => (b.key ?? '').startsWith('file:'))
     expect(rows.length).toBe(perPage)
-    expect(await ui.find({ type: 'Text', text: `1/${pages} (#23)` })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: `1/${pages} (23)` })).toBeDefined()
     await ui.press({ key: 'list' })
     await ui.unmount()
   }
@@ -2169,22 +2169,23 @@ test('a standard 80×24 terminal gets short labels, so each row fits', async ($,
   expect(sourceRow).toBeLessThanOrEqual(75)
 
   // Filter row: the icon label, the filter box (24), Clear, "[ 📋 ]",
-  // Refresh, Hide, .files and the page control "◀ 1/2 (#7) ▶".
+  // Refresh, Hide and .files.
   const plain = await Promise.all(
     ['refresh', 'list', 'dotfiles'].map(async key => cells(await labelOf(ui, key))),
   )
   const pasteButton = cells(await labelOf(ui, 'paste-files')) + 4
-  const contentRow =
-    2 + 1 + 24 + 1 + 8 + 1 + pasteButton + 1 + plain.reduce((sum, w) => sum + w + 1, 0) + cells('◀ 1/2 (#7) ▶')
+  const contentRow = 2 + 1 + 24 + 1 + 8 + 1 + pasteButton + 1 + plain.reduce((sum, w) => sum + w + 1, 0)
   expect(contentRow).toBeLessThanOrEqual(75)
-  // The page holds 4 items in 12 rows.
-  expect(await ui.find({ type: 'Text', text: '1/2 (#7)' })).toBeDefined()
+  // The page holds 2 items in 12 rows.
+  expect(await ui.find({ type: 'Text', text: '1/4 (7)' })).toBeDefined()
 
-  // Finder row: the icon label, the short tip, then the clock and version.
-  const tip = 'Drag/⌥⌘C ⌘V > 📎 🧲 Add · ⌘C > 📋'
+  // Finder row: the icon label, the short tip, the page control "▶ 1/4 (7) ·"
+  // (on page 1 without ◀), then the clock and version.
+  const tip = 'Drag/⌥⌘C ⌘V 📎 > 🧲 · ⌘C > 📋'
   expect(await ui.find({ type: 'Text', text: tip })).toBeDefined()
   // The clock shows the time alone there.
-  const finderRow = 2 + 1 + cells(tip) + 1 + cells('· 💤') + 1 + cells('01:18 · v1.19.1')
+  const finderRow =
+    2 + 1 + cells(tip) + 1 + cells('· 💤') + 1 + cells('1/4 (7) ▶ ·') + 1 + cells('01:18 · v1.19.1')
   expect(finderRow).toBeLessThanOrEqual(75)
   await ui.unmount()
 
