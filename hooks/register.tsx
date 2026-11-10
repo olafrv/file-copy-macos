@@ -2424,8 +2424,9 @@ export const register: Register = (on, options) => {
             <Text>{label('💡', 'Finder')}</Text>
           </Box>
           {/* The page control first: right under the table, at its left. */}
+          {/* On the desktop the buttons' padding alone keeps the parts apart. */}
           {listOpen && pageCount > 1 && (
-            <Box flexShrink={0} flexDirection="row" gap={1}>
+            <Box flexShrink={0} flexDirection="row" gap={lines ? 1 : 0}>
               {shownPage > 0 && (
                 <Button
                   key="page-prev"
@@ -2443,7 +2444,7 @@ export const register: Register = (on, options) => {
                   onPress={() => update($, page, () => shownPage + 1)}
                 />
               )}
-              <Text dimColor>·</Text>
+              <Text dimColor>{lines || shownPage < pageCount - 1 ? '·' : ' ·'}</Text>
             </Box>
           )}
           <Box key="tip:finder-tip" flexShrink={1}>
