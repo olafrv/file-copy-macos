@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.27.3
+
+- Desktop: the page control has no extra gaps; the padding of ◀ and ▶ alone keeps them apart from the page info.
+- README: a tip for the desktop app: set Settings > Appearance > Transcript text size to Small for more room.
+
 ## 1.27.2
 
 - Long names are cut in the middle with "…", so the end (a date, the file type) stays visible: in the table, in ⤴️ next to the Name header and in the copy result.
