@@ -229,10 +229,18 @@ const DESKTOP_ACTIONS_ICON_WIDTH = 26
 const MIN_NAME_WIDTH = 16
 
 // An icon and a name cut to `width` cells with "…"; the icon takes 2 cells.
+// The cut is in the middle: the start and the end (a date, the extension)
+// stay readable.
 const fitName = (label: string, width: number): string => {
   const chars = [...label]
 
-  return chars.length + 1 <= width ? label : `${chars.slice(0, width - 2).join('')}…`
+  if (chars.length + 1 <= width) {
+    return label
+  }
+
+  const tail = Math.floor((width - 2) / 2)
+
+  return `${chars.slice(0, width - 2 - tail).join('')}…${chars.slice(chars.length - tail).join('')}`
 }
 
 // A header button sorts by its column; again, the other way round.
@@ -1641,16 +1649,12 @@ export const register: Register = (on, options) => {
       )
     // The Name cell. The terminal counts cells exactly: a fixed width. The
     // desktop draws buttons and text in its own sizes, so there the cell takes
-    // what the other cells leave (they keep their own width), and the name is
-    // cut with "…" by the desktop itself: nothing can stick out of the table.
-    const nameButton = (key: string, text: string, onPress: () => unknown): RenderElement =>
-      lines ? (
-        <Button key={key} label={fitName(text, nameWidth)} plain onPress={onPress} />
-      ) : (
-        <Button key={key} label={text} plain onPress={onPress}>
-          <Text wrap="truncate-end">{text}</Text>
-        </Button>
-      )
+    // what the other cells leave (they keep their own width). Both show a long
+    // name cut in the middle, in the label: the desktop draws a Button's label,
+    // not its children, and cuts neither itself.
+    const nameButton = (key: string, text: string, onPress: () => unknown): RenderElement => (
+      <Button key={key} label={fitName(text, nameWidth)} plain onPress={onPress} />
+    )
     // The desktop's buttons are taller than a row: a table row as high as they
     // are, its cells centered in it.
     const tableRow = lines ? {} : ({ height: TABLE_ROW_HEIGHT, alignItems: 'center' } as const)
@@ -1718,17 +1722,14 @@ export const register: Register = (on, options) => {
     const tableWidth = textWidth + frame
     // ⤴️ and the parent folder's name: one level up.
     const upLabel = `⤴️ ${parentOf(dir) === '' ? baseName(root) : baseName(parentOf(dir))}/`
-    const upButton = (text: string): RenderElement =>
-      lines ? (
-        <Button key="up" label={text} plain onPress={() => openFolder($, parentOf(dir))} />
-      ) : (
-        <Button key="up" label={text} plain onPress={() => openFolder($, parentOf(dir))}>
-          <Text wrap="truncate-end">{text}</Text>
-        </Button>
-      )
-    // In the terminal's Name header: what "Name ▲" and the gap leave.
+    const upButton = (text: string): RenderElement => (
+      <Button key="up" label={text} plain onPress={() => openFolder($, parentOf(dir))} />
+    )
+    // In the Name header: what "Name ▲" and the gap leave.
     const headUpLabel = fitName(upLabel, nameWidth - `Name${arrow('name')}`.length - 1)
     const showResult = result !== null && !hidden && !isBusy && ask === null
+    // The copy result's names: what the label, ❌ Delete and 🫣 Hide leave.
+    const resultWidth = Math.max(MIN_NAME_WIDTH, e.props.bodyColumns - labelWidth - 24)
     const text = await read($, draft)
     const paths = parsePaths(text)
     const dirs = await read($, pastedDirs)
@@ -2086,7 +2087,7 @@ export const register: Register = (on, options) => {
                                 upButton(headUpLabel),
                                 -1,
                               )
-                            : upButton(upLabel)}
+                            : upButton(headUpLabel)}
                         </Box>
                       )}
                     </Box>
@@ -2204,7 +2205,7 @@ export const register: Register = (on, options) => {
                                 openFolder($, `${dir === '' ? '' : `${dir}/`}${name.slice(0, -1)}`),
                               )
                             : nameButton(`file:${name}`, `📄 ${entryName(name)}`, () => openWithDefaultApp($, name))}
-                          {fitName(`📄 ${entryName(name)}`, nameWidth).endsWith('…') && (
+                          {fitName(`📄 ${entryName(name)}`, nameWidth) !== `📄 ${entryName(name)}` && (
                             <Box position="absolute" top={-1} left={1} display="none" hover={{ display: 'flex' }}>
                               <Text inverse>{` ${entryName(name)} `}</Text>
                             </Box>
@@ -2352,7 +2353,7 @@ export const register: Register = (on, options) => {
             {result.copied.length > 0 && <Text color="green">{label('✅', 'Copied')}</Text>}
             {result.copied.length > 0 && (
               <Box flexShrink={1}>
-                <Text wrap="truncate-end">{result.copied.join(', ')}</Text>
+                <Text wrap="truncate-end">{fitName(result.copied.join(', '), resultWidth)}</Text>
               </Box>
             )}
             {result.copied.length > 0 && !confirmingLast && (
@@ -2391,13 +2392,13 @@ export const register: Register = (on, options) => {
             {result.skipped.length > 0 && <Text dimColor>{label('⏭️', 'Skipped')}</Text>}
             {result.skipped.length > 0 && (
               <Box flexShrink={1}>
-                <Text dimColor wrap="truncate-end">{result.skipped.join(', ')}</Text>
+                <Text dimColor wrap="truncate-end">{fitName(result.skipped.join(', '), resultWidth)}</Text>
               </Box>
             )}
             {result.failed.length > 0 && <Text color="yellow">{label('⚠', 'Failed')}</Text>}
             {result.failed.length > 0 && (
               <Box flexShrink={1}>
-                <Text wrap="truncate-end">{result.failed.join(', ')}</Text>
+                <Text wrap="truncate-end">{fitName(result.failed.join(', '), resultWidth)}</Text>
               </Box>
             )}
             {!confirmingLast && (

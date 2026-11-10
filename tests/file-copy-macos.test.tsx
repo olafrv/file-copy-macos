@@ -1219,15 +1219,11 @@ test('Content is a table: header, tick, name, size and actions per row', async (
     expect(await ui.find({ key: 'rename:docs/' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '13 KB' })).toBeDefined()
 
-    // A name too long for its column: the terminal cuts it with "…" to fit;
-    // the desktop gives the whole name to a text that cuts itself at the end
-    // of its cell, which takes the room the other cells leave.
+    // A name too long for its column is cut in the middle with "…", so its
+    // end stays: in the label on both surfaces (the desktop draws the label).
     const button = await ui.find({ key: `file:${long}` })
     const label = String(button?.props.label)
-    expect(label.endsWith('…')).toBe(surface === 'terminal')
-    if (surface === 'desktop') {
-      expect((await ui.find({ type: 'Text', text: `📄 ${long}` }))?.props.wrap).toBe('truncate-end')
-    }
+    expect(label).toMatch(/^📄 A very.*….*\.pdf$/)
     // Pointing at it shows the whole name; a name that fits gets no tip.
     expect((await ui.find({ type: 'Text', text: ` ${long} ` }))?.props.inverse).toBe(true)
     expect(await ui.find({ type: 'Text', text: ' a.pdf ' })).toBeUndefined()
