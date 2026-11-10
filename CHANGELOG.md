@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.27.2
+
+- Long names are cut in the middle with "…", so the end (a date, the file type) stays visible: in the table, in ⤴️ next to the Name header and in the copy result.
+- Desktop: a long name no longer pushes the Size and action columns out of the table.
+
 ## 1.27.1
 
 - The copy result ("✅ Copied: … ❌ Delete 🫣 Hide") has the same look as "1 selected: ❌ Delete": one line under the table, with its question "Delete the copied file?" and the buttons on the same line, and ⏹️ Cancel without a frame.
