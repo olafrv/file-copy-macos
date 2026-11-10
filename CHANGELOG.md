@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.27.4
+
+- Desktop: tips no longer use inverted colors, so the light theme shows no black box inside the tip's bubble. The terminal keeps inverted tips.
+
 ## 1.27.3
 
 - Desktop: the page control has no extra gaps; the padding of ◀ and ▶ alone keeps them apart from the page info.
