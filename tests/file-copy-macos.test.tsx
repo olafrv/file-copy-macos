@@ -867,7 +867,7 @@ test('below 100 columns the actions show icons alone, each with a tip while Tips
     // Tips off: no tip; on: each icon says what it does, and so does 📅.
     expect(await narrow.find({ type: 'Text', text: ' Rename ' })).toBeUndefined()
     await narrow.press({ key: 'tips' })
-    expect((await narrow.find({ type: 'Text', text: ' Rename ' }))?.props.inverse).toBe(true)
+    expect((await narrow.find({ type: 'Text', text: ' Rename ' }))?.props.inverse).toBe(surface === 'terminal')
     expect(await narrow.find({ type: 'Text', text: ' Show in Finder ' })).toBeDefined()
     await narrow.press({ key: 'tips' })
     await narrow.press({ key: 'list' })
@@ -1225,7 +1225,7 @@ test('Content is a table: header, tick, name, size and actions per row', async (
     const label = String(button?.props.label)
     expect(label).toMatch(/^📄 A very.*….*\.pdf$/)
     // Pointing at it shows the whole name; a name that fits gets no tip.
-    expect((await ui.find({ type: 'Text', text: ` ${long} ` }))?.props.inverse).toBe(true)
+    expect((await ui.find({ type: 'Text', text: ` ${long} ` }))?.props.inverse).toBe(surface === 'terminal')
     expect(await ui.find({ type: 'Text', text: ' a.pdf ' })).toBeUndefined()
     // The terminal's table takes the whole width (100): tick (2), size (9),
     // actions (47), padding and frame (10) and 3 column lines leave 29 for
@@ -1917,7 +1917,7 @@ test('the Tips switch shows the help tips, only where a label does not say enoug
     expect((await ui.find({ key: 'tips' }))?.props.label).toBe('✅ Tips')
     expect(store.tipsOn).toBe(true)
     for (const text of kept) {
-      expect((await ui.find({ type: 'Text', text }))?.props.inverse).toBe(true)
+      expect((await ui.find({ type: 'Text', text }))?.props.inverse).toBe(surface === 'terminal')
     }
 
     for (const text of gone) {

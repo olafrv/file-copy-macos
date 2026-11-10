@@ -1680,7 +1680,7 @@ export const register: Register = (on, options) => {
         <Box key={`tip:${key}`}>
           {button}
           <Box position="absolute" top={top} left={0} display="none" hover={{ display: 'flex' }}>
-            <Text inverse>{` ${tip} `}</Text>
+            <Text inverse={lines}>{` ${tip} `}</Text>
           </Box>
         </Box>
       )
@@ -1818,7 +1818,7 @@ export const register: Register = (on, options) => {
               <Button key="latest-desktop" label={narrow ? '🧲🖥️' : '🧲 Desktop'} onPress={() => copyNewestFrom($, 'Desktop')} />
               {tipsOn && (
                 <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-                  <Text inverse>{` Copy newest item of ~/Desktop, for example a screenshot `}</Text>
+                  <Text inverse={lines}>{` Copy newest item of ~/Desktop, for example a screenshot `}</Text>
                 </Box>
               )}
             </Box>
@@ -1830,7 +1830,7 @@ export const register: Register = (on, options) => {
               />
               {tipsOn && (
                 <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-                  <Text inverse>{` Copy newest item of ~/Downloads `}</Text>
+                  <Text inverse={lines}>{` Copy newest item of ~/Downloads `}</Text>
                 </Box>
               )}
             </Box>
@@ -1870,7 +1870,7 @@ export const register: Register = (on, options) => {
                 fitCrumbs); a keyed Box, so pointing at it shows the full path. */}
             <Box key="target-path" flexDirection="row" flexShrink={1}>
               <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
-                <Text inverse>{` ${shortPath(target)} `}</Text>
+                <Text inverse={lines}>{` ${shortPath(target)} `}</Text>
               </Box>
               <Text dimColor>{path.above}</Text>
               {path.crumbs.map((crumb, at) => (
@@ -1968,7 +1968,7 @@ export const register: Register = (on, options) => {
               />
               {tipsOn && (
                 <Box position="absolute" top={1} right={0} display="none" hover={{ display: 'flex' }}>
-                  <Text inverse>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
+                  <Text inverse={lines}>{` Copy files you copied in Finder with Cmd+C, or a copied image `}</Text>
                 </Box>
               )}
             </Box>
@@ -2207,7 +2207,7 @@ export const register: Register = (on, options) => {
                             : nameButton(`file:${name}`, `📄 ${entryName(name)}`, () => openWithDefaultApp($, name))}
                           {fitName(`📄 ${entryName(name)}`, nameWidth) !== `📄 ${entryName(name)}` && (
                             <Box position="absolute" top={-1} left={1} display="none" hover={{ display: 'flex' }}>
-                              <Text inverse>{` ${entryName(name)} `}</Text>
+                              <Text inverse={lines}>{` ${entryName(name)} `}</Text>
                             </Box>
                           )}
                         </Box>
@@ -2236,7 +2236,7 @@ export const register: Register = (on, options) => {
                               display="none"
                               hover={{ display: 'flex' }}
                             >
-                              <Text inverse>
+                              <Text inverse={lines}>
                                 {` ${shortPath([target, entryFolder(name)].filter(p => p !== '').join('/'))} `}
                               </Text>
                             </Box>
@@ -2457,7 +2457,7 @@ export const register: Register = (on, options) => {
             </Text>
             {tipsOn && (
               <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
-                <Text inverse>{` ${FINDER_TIP_LONG} `}</Text>
+                <Text inverse={lines}>{` ${FINDER_TIP_LONG} `}</Text>
               </Box>
             )}
           </Box>
