@@ -27,6 +27,7 @@ const BAND = {
   props: {
     hasSurvey: false,
     isWorking: false,
+    isCollapsed: false,
     maxRows: 15,
     bodyColumns: 100,
     scroll: { offset: 0, bodyRows: 10 },
@@ -776,10 +777,11 @@ test('the bar shows only in the terminal and the desktop app, not in VS Code or 
     await ui.unmount()
   }
 
-  // Elsewhere the mod passes the render on and draws nothing; with no other
-  // plugin there is then nothing to mount.
+  // Elsewhere the mod passes the render on and draws nothing.
   for (const surface of ['vscode', 'mobile'] as const) {
-    await expect($.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })).rejects.toThrow('no implementation for ui.render')
+    const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })
+    expect(await ui.find({ key: 'pick' })).toBeUndefined()
+    await ui.unmount()
   }
 })
 

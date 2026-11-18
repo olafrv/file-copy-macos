@@ -1728,13 +1728,42 @@ export const register: Register = (on, options) => {
     // In the Name header: what "Name ▲" and the gap leave.
     const headUpLabel = fitName(upLabel, nameWidth - `Name${arrow('name')}`.length - 1)
     const showResult = result !== null && !hidden && !isBusy && ask === null
-    // The copy result's names: what the label, ❌ Delete and 🫣 Hide leave.
-    const resultWidth = Math.max(MIN_NAME_WIDTH, e.props.bodyColumns - labelWidth - 24)
+    const confirmingLast = await read($, isConfirmingLast)
+    // The copy result's lists (Copied, Skipped, Failed) share what their
+    // labels and the buttons leave of the line (❌ Delete and 🫣 Hide, or
+    // the delete question with its two buttons), each cut in the middle.
+    const resultKinds = result === null ? 0 : [result.copied, result.skipped, result.failed].filter(l => l.length > 0).length
+    const resultButtons = result !== null && result.copied.length > 0 ? (confirmingLast ? 50 : 24) : 12
+    const resultWidth = Math.max(
+      12,
+      Math.floor((e.props.bodyColumns - resultButtons - resultKinds * (labelWidth + 2)) / Math.max(1, resultKinds)),
+    )
+    // One list of the copy result: its label (never squeezed) and its names,
+    // whole while the pointer is over them when they are cut.
+    const resultPart = (kind: string, title: RenderElement, items: readonly string[], isDim: boolean): RenderElement[] => {
+      const whole = items.join(', ')
+      const shown = fitName(whole, resultWidth)
+
+      return [
+        <Box key={`result-label:${kind}`} flexShrink={0}>
+          {title}
+        </Box>,
+        <Box key={`result:${kind}`} flexShrink={1}>
+          <Text dimColor={isDim} wrap="truncate-end">
+            {shown}
+          </Text>
+          {shown !== whole && (
+            <Box position="absolute" top={-1} left={0} display="none" hover={{ display: 'flex' }}>
+              <Text inverse={lines}>{` ${whole} `}</Text>
+            </Box>
+          )}
+        </Box>,
+      ]
+    }
     const text = await read($, draft)
     const paths = parsePaths(text)
     const dirs = await read($, pastedDirs)
     const message = await read($, hint)
-    const confirmingLast = await read($, isConfirmingLast)
     const startText = await read($, seed)
     const count = paths.length
 
@@ -2350,18 +2379,16 @@ export const register: Register = (on, options) => {
             alignItems="center"
             marginTop={rowSpace && listOpen && ticked.length > 0 ? rowSpace : 0}
           >
-            {result.copied.length > 0 && <Text color="green">{label('✅', 'Copied')}</Text>}
-            {result.copied.length > 0 && (
-              <Box flexShrink={1}>
-                <Text wrap="truncate-end">{fitName(result.copied.join(', '), resultWidth)}</Text>
-              </Box>
-            )}
+            {result.copied.length > 0 &&
+              resultPart('copied', <Text color="green">{label('✅', 'Copied')}</Text>, result.copied, false)}
             {result.copied.length > 0 && !confirmingLast && (
-              <Button
-                key="trash"
-                label="❌ Delete"
-                onPress={() => update($, isConfirmingLast, () => true)}
-              />
+              <Box flexShrink={0}>
+                <Button
+                  key="trash"
+                  label="❌ Delete"
+                  onPress={() => update($, isConfirmingLast, () => true)}
+                />
+              </Box>
             )}
             {/* The question and its buttons on one line, as for the ticked items. */}
             {result.copied.length > 0 && confirmingLast && (
@@ -2389,20 +2416,14 @@ export const register: Register = (on, options) => {
                 onPress={() => update($, isConfirmingLast, () => false)}
               />
             )}
-            {result.skipped.length > 0 && <Text dimColor>{label('⏭️', 'Skipped')}</Text>}
-            {result.skipped.length > 0 && (
-              <Box flexShrink={1}>
-                <Text dimColor wrap="truncate-end">{fitName(result.skipped.join(', '), resultWidth)}</Text>
-              </Box>
-            )}
-            {result.failed.length > 0 && <Text color="yellow">{label('⚠', 'Failed')}</Text>}
-            {result.failed.length > 0 && (
-              <Box flexShrink={1}>
-                <Text wrap="truncate-end">{fitName(result.failed.join(', '), resultWidth)}</Text>
-              </Box>
-            )}
+            {result.skipped.length > 0 &&
+              resultPart('skipped', <Text dimColor>{label('⏭️', 'Skipped')}</Text>, result.skipped, true)}
+            {result.failed.length > 0 &&
+              resultPart('failed', <Text color="yellow">{label('⚠', 'Failed')}</Text>, result.failed, false)}
             {!confirmingLast && (
-              <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
+              <Box flexShrink={0}>
+                <Button key="hide" label="🫣 Hide" onPress={() => update($, isHidden, () => true)} />
+              </Box>
             )}
           </Box>
         )}
