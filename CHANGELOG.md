@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.27.5
+
+- The copy result line fits the bar when it shows both copied and failed items: the lists share the line, each cut in the middle with "…" and shown whole on hover. The labels, ❌ Delete and 🫣 Hide keep their full size, so 🫣 Hide is always visible.
+- Tests: updated for the newer engine. In VS Code and on mobile the mount now works, and the test checks that nothing is drawn there. The test bar sets the new `isCollapsed` prop.
+
 ## 1.27.4
 
 - Desktop: tips no longer use inverted colors, so the light theme shows no black box inside the tip's bubble. The terminal keeps inverted tips.
