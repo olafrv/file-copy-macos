@@ -777,6 +777,17 @@ test('the bar shows only in the terminal and the desktop app, not in VS Code or 
     await ui.unmount()
   }
 
+  // Collapsed: an empty tree, nothing of the rows.
+  const collapsed = await $.ui.mount({
+    plugin: 'file-copy-macos',
+    surface: 'desktop',
+    ...BAND,
+    props: { ...BAND.props, isCollapsed: true },
+  })
+  expect(await collapsed.find({ key: 'pick' })).toBeUndefined()
+  expect(await collapsed.find({ type: 'Box' })).toBeDefined()
+  await collapsed.unmount()
+
   // Elsewhere the mod passes the render on and draws nothing.
   for (const surface of ['vscode', 'mobile'] as const) {
     const ui = await $.ui.mount({ plugin: 'file-copy-macos', surface, ...BAND })

@@ -1558,6 +1558,12 @@ export const register: Register = (on, options) => {
 
     const { Box, Button, Input, Link, Text } = $.ui.resolve(e)
 
+    // Collapsed ([-] or ctrl+x ctrl+a): nothing of the bar is on screen, so
+    // it reads no state and builds no rows until it is opened again.
+    if (e.props.isCollapsed) {
+      return <Box />
+    }
+
     const root = await $.session.root()
     const dir = await read($, subdir)
     const modVersion = await read($, version)
