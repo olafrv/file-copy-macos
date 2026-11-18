@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.28.0
+
+- While the bar is collapsed (`[-]` or Ctrl+X Ctrl+A in the terminal), the mod does no work: it reads no state and builds no rows until the bar is opened again.
+- The plugin has an icon (`.claude-plugin/icon.png`).
+
 ## 1.27.5
 
 - The copy result line fits the bar when it shows both copied and failed items: the lists share the line, each cut in the middle with "…" and shown whole on hover. The labels, ❌ Delete and 🫣 Hide keep their full size, so 🫣 Hide is always visible.
